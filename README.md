@@ -9,10 +9,10 @@ If you maintain a large To Read list sorted by position (priority), Goodreads ma
 When you visit a book page on Goodreads (e.g. `goodreads.com/book/show/12345`), the extension checks if the book is on your To Read shelf. If it is, a widget appears:
 
 ```
-To Read position: [ 42 ] [Save]
+To Read position: [ 42 ] [Save] [↻]
 ```
 
-Change the number, hit Enter or click Save, and you're done.
+Change the number, hit Enter or click Save, and you're done. Click ↻ to refresh the position from your shelf.
 
 ## Install
 
@@ -39,7 +39,7 @@ The extension will remain active until you restart Firefox.
 4. Injects a position input widget on the page
 5. Saves position changes via Goodreads' internal API
 
-First load may take a few seconds (fetches your shelf data). Subsequent visits to any book page are instant thanks to localStorage caching.
+First load may take a few seconds (fetches your shelf data). Subsequent visits to any book page are instant thanks to localStorage caching. Cache expires after 4 hours by default — configurable in the extension's options (Add-ons Manager → GR Shelf Position Editor → Options).
 
 ## Requirements
 
