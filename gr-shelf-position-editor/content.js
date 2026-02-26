@@ -3,6 +3,9 @@
 
   const LOG = (...args) => console.log("[GR Shelf Position]", ...args);
 
+  // Guard against double injection (SPA navigation can re-trigger content scripts)
+  if (document.getElementById("gr-book-pos-widget")) return;
+
   // --- Step 1: Extract book ID from URL ---
 
   const bookIdMatch = window.location.pathname.match(/\/book\/show\/(\d+)/);
