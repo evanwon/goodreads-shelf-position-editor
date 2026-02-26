@@ -253,7 +253,7 @@
     return result;
   }
 
-  // --- Step 5: Inject notice (degraded state) ---
+  // --- Step 6: Inject notice (degraded state) ---
 
   function injectNotice(message) {
     if (document.getElementById("gr-book-pos-widget")) return;
@@ -275,7 +275,7 @@
     LOG("Notice injected:", message);
   }
 
-  // --- Step 6: Inject widget ---
+  // --- Step 7: Inject widget ---
 
   function injectWidget(shelfId, position, userId, authToken, reviewId) {
     // Find a suitable anchor point on the book page
@@ -361,7 +361,7 @@
     LOG("Widget injected, current position:", position);
   }
 
-  // --- Step 7: Save position ---
+  // --- Step 8: Save position ---
 
   async function savePosition(input, saveBtn, userId, authToken) {
     const val = input.value.trim();

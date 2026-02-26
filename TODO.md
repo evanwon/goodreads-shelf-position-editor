@@ -5,10 +5,10 @@ Prioritized by impact. See the full review in `.claude/plans/reflective-scribbli
 
 ## P2 — Security Hardening
 
-- [ ] **Narrow host permissions** (`manifest.json`)
+- [x] **Narrow host permissions** (`manifest.json`)
   Replace `*://www.goodreads.com/*` with specific URL patterns:
-  `*://www.goodreads.com/`, `*://www.goodreads.com/book/show/*`,
-  `*://www.goodreads.com/review/list/*`, `*://www.goodreads.com/shelf/move_batch/*`
+  `*://www.goodreads.com/`, `*://www.goodreads.com/review/list/*`,
+  `*://www.goodreads.com/shelf/move_batch/*`
 
 - [ ] **Validate position value from server** (`content.js:298`)
   Before setting `input.value = position`, verify the value is a positive integer.
@@ -30,7 +30,7 @@ Prioritized by impact. See the full review in `.claude/plans/reflective-scribbli
   - Add a cache TTL (e.g. 1 hour)
   - Re-fetch position for the current book on each visit (1 request)
 
-- [ ] **Fix step numbering comments** (`content.js:256`)
+- [x] **Fix step numbering comments** (`content.js:256`)
   Step 5 is duplicated — the shelf lookup (line 143) and the widget injection (line 256)
   both say "Step 5". Renumber correctly.
 
@@ -40,5 +40,5 @@ Prioritized by impact. See the full review in `.claude/plans/reflective-scribbli
   Firefox recommends 96px for toolbar and AMO listing. Add `"96": "icons/icon-96.svg"`
   to `manifest.json` icons and create the SVG.
 
-- [ ] **Add `author` and `homepage_url` to manifest**
+- [x] **Add `author` and `homepage_url` to manifest**
   Optional but recommended for AMO listings. Helps establish trust.
