@@ -68,7 +68,14 @@
   border-color: #c62828;
 }
 
+.gr-book-pos-total {
+  color: #666;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .gr-book-pos-save {
+  min-width: 60px;
   padding: 4px 12px;
   background-color: #409D69;
   color: #fff;
@@ -85,8 +92,13 @@
   background-color: #357a54;
 }
 
+.gr-book-pos-save:focus-visible {
+  outline: 2px solid #00635D;
+  outline-offset: 2px;
+}
+
 .gr-book-pos-save:disabled {
-  background-color: #999;
+  background-color: #8CB89E;
   cursor: not-allowed;
 }
 
@@ -104,6 +116,11 @@
 
 .gr-book-pos-refresh:hover:not(:disabled) {
   background-color: #E8E8E0;
+}
+
+.gr-book-pos-refresh:focus-visible {
+  outline: 2px solid #00635D;
+  outline-offset: 2px;
 }
 
 .gr-book-pos-refresh:disabled {

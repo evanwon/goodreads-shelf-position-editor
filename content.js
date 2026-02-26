@@ -229,7 +229,7 @@
 
     if (cache.has(reviewId)) {
       LOG("Phase 2 — cache hit for review", reviewId);
-      return cache.get(reviewId);
+      return { ...cache.get(reviewId), totalBooks: cache.size };
     }
 
     LOG("Phase 2 — paginating shelf for review", reviewId);
@@ -256,7 +256,7 @@
       if (rowCount === 0) break;
 
       if (cache.has(reviewId) && !result) {
-        result = cache.get(reviewId);
+        result = { ...cache.get(reviewId), totalBooks: cache.size };
         LOG("Found on page", page);
         // Keep paginating to fill cache, but stop after this page
         saveCache(userId, cache);
@@ -273,7 +273,7 @@
 
     // Save whatever we cached even if book wasn't found
     saveCache(userId, cache);
-    return result;
+    return result ? { ...result, totalBooks: cache.size } : null;
   }
 
   // --- Step 6: Widget lifecycle (loading → loaded / empty / error) ---
@@ -311,7 +311,7 @@
   function createNameElement() {
     const name = document.createElement("span");
     name.className = "gr-book-pos-name";
-    name.textContent = "Shelf Position";
+    name.textContent = "To Read Position";
     return name;
   }
 
@@ -347,7 +347,7 @@
     if (status) status.textContent = text;
   }
 
-  function transitionToLoaded(widget, shelfId, position, userId, authToken, reviewId) {
+  function transitionToLoaded(widget, shelfId, position, userId, authToken, reviewId, totalBooks) {
     clearChildren(widget);
 
     const label = document.createElement("span");
@@ -364,16 +364,25 @@
     input.dataset.reviewId = reviewId;
     input.placeholder = "#";
 
+    const totalLabel = document.createElement("span");
+    totalLabel.className = "gr-book-pos-total";
+    if (totalBooks) {
+      totalLabel.textContent = `of ${totalBooks}`;
+    }
+
     const saveBtn = document.createElement("button");
     saveBtn.className = "gr-book-pos-save";
     saveBtn.textContent = "Save";
     saveBtn.disabled = true;
 
     input.addEventListener("input", () => {
-      const changed = input.value !== input.dataset.originalValue;
-      saveBtn.disabled = !changed;
-      input.classList.toggle("gr-book-pos-changed", changed);
-      input.classList.remove("gr-book-pos-saved", "gr-book-pos-error");
+      const val = input.value.trim();
+      const invalid = val !== "" && (!/^\d+$/.test(val) || parseInt(val, 10) < 1);
+      const changed = val !== input.dataset.originalValue;
+      saveBtn.disabled = !changed || invalid;
+      input.classList.toggle("gr-book-pos-changed", changed && !invalid);
+      input.classList.toggle("gr-book-pos-error", invalid);
+      if (!invalid) input.classList.remove("gr-book-pos-saved");
     });
 
     input.addEventListener("keydown", (e) => {
@@ -425,6 +434,7 @@
     widget.appendChild(createNameElement());
     widget.appendChild(label);
     widget.appendChild(input);
+    widget.appendChild(totalLabel);
     widget.appendChild(saveBtn);
     widget.appendChild(refreshBtn);
 
@@ -441,7 +451,7 @@
 
     const desc = document.createElement("span");
     desc.className = "gr-book-pos-empty-desc";
-    desc.textContent = "\u00B7 Shows position for books you\u2019ve shelved as To Read";
+    desc.textContent = "\u00B7 Add this book to your To Read shelf to set its position";
 
     widget.appendChild(createNameElement());
     widget.appendChild(label);
@@ -450,7 +460,7 @@
     LOG("Widget: not on shelf");
   }
 
-  function transitionToError(widget, message) {
+  function transitionToError(widget, message, onRetry) {
     clearChildren(widget);
 
     const msg = document.createElement("span");
@@ -459,6 +469,19 @@
 
     widget.appendChild(createNameElement());
     widget.appendChild(msg);
+
+    if (onRetry) {
+      const retryBtn = document.createElement("button");
+      retryBtn.className = "gr-book-pos-refresh";
+      retryBtn.textContent = "\u21BB";
+      retryBtn.title = "Retry";
+      retryBtn.addEventListener("click", () => {
+        retryBtn.disabled = true;
+        retryBtn.classList.add("gr-book-pos-spinning");
+        onRetry();
+      });
+      widget.appendChild(retryBtn);
+    }
 
     LOG("Widget error:", message);
   }
@@ -561,7 +584,7 @@
         return;
       }
       if (!auth.csrf) {
-        transitionToError(widget, "Could not load shelf data \u2014 try refreshing the page.");
+        transitionToError(widget, "Could not load shelf data", () => window.location.reload());
         return;
       }
 
@@ -598,15 +621,19 @@
       if (!result) {
         LOG("Could not find shelf data for review", reviewId,
           "\u2014 book is on shelf but position data not found (shelf may exceed pagination limit)");
-        transitionToError(widget, "On your To Read shelf, but position data could not be loaded.");
+        transitionToError(widget, "On your To Read shelf, but position data could not be loaded.", () => {
+          localStorage.removeItem(cacheKey(userId));
+          localStorage.removeItem(cacheKey(userId) + "-ts");
+          window.location.reload();
+        });
         return;
       }
 
       LOG("Found \u2014 shelfId:", result.shelfId, "position:", result.position);
-      transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId);
+      transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId, result.totalBooks);
     } catch (err) {
       LOG("Error:", err);
-      transitionToError(widget, "Something went wrong \u2014 try refreshing the page.");
+      transitionToError(widget, "Something went wrong", () => window.location.reload());
     }
   })();
 })();
