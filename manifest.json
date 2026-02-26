@@ -16,5 +16,15 @@
   ],
   "permissions": [
     "*://www.goodreads.com/*"
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "gr-shelf-position-editor@evanw",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": ["websiteActivity"],
+        "optional": []
+      }
+    }
+  }
 }

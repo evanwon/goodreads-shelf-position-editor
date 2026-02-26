@@ -253,7 +253,29 @@
     return result;
   }
 
-  // --- Step 5: Inject widget ---
+  // --- Step 5: Inject notice (degraded state) ---
+
+  function injectNotice(message) {
+    if (document.getElementById("gr-book-pos-widget")) return;
+    const anchor =
+      document.querySelector(".BookActions") ||
+      document.querySelector(".wtrButtonContainer") ||
+      document.querySelector("[data-testid='shelfButton']") ||
+      document.querySelector(".BookPage__bookActions") ||
+      document.querySelector("main") ||
+      document.body;
+
+    const widget = document.createElement("div");
+    widget.id = "gr-book-pos-widget";
+    const label = document.createElement("span");
+    label.className = "gr-book-pos-label";
+    label.textContent = message;
+    widget.appendChild(label);
+    anchor.insertAdjacentElement("afterend", widget);
+    LOG("Notice injected:", message);
+  }
+
+  // --- Step 6: Inject widget ---
 
   function injectWidget(shelfId, position, userId, authToken, reviewId) {
     // Find a suitable anchor point on the book page
@@ -320,7 +342,11 @@
       }
     });
 
-    saveBtn.addEventListener("click", () => savePosition(input, saveBtn, userId, authToken));
+    saveBtn.addEventListener("click", () => {
+      if (saveBtn.disabled) return;
+      saveBtn.disabled = true;
+      savePosition(input, saveBtn, userId, authToken);
+    });
 
     widget.appendChild(label);
     widget.appendChild(input);
@@ -335,7 +361,7 @@
     LOG("Widget injected, current position:", position);
   }
 
-  // --- Step 6: Save position ---
+  // --- Step 7: Save position ---
 
   async function savePosition(input, saveBtn, userId, authToken) {
     const val = input.value.trim();
@@ -435,6 +461,7 @@
     }
     if (!auth.csrf) {
       LOG("No CSRF token found. Skipping.");
+      injectNotice("Could not load shelf data — try refreshing the page.");
       return;
     }
 
@@ -465,7 +492,9 @@
       const result = await findShelfData(userId, reviewId);
 
       if (!result) {
-        LOG("Could not find shelf data for review", reviewId);
+        LOG("Could not find shelf data for review", reviewId,
+          "— book is on shelf but position data not found (shelf may exceed pagination limit)");
+        injectNotice("On your To Read shelf, but position data could not be loaded.");
         return;
       }
 
