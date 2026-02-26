@@ -45,7 +45,7 @@ content.js runs on every `/book/show/*` page and executes these steps:
 - **User ID**: `localStorage["gr-book-pos-userid"]` — avoids slow homepage fetch on repeat visits (CSRF still needed per session)
 - **Shelf data**: `localStorage["gr-pos-fixer-{USER_ID}"]` — maps `reviewId -> { shelfId, position }` for all books seen during pagination. Shared with the older position-fixer extension. First visit paginates; subsequent visits are instant cache hits
 - **Timestamp**: `localStorage["gr-pos-fixer-{USER_ID}-ts"]` — tracks when shelf data was last written
-- **TTL**: configurable via extension options (`browser.storage.local["cacheTtlHours"]`), default 4 hours. Set to 0 to disable caching
+- **TTL**: configurable via extension options (`browser.storage.local["cacheTtlHours"]`), default 168 hours (1 week). Set to 0 to disable caching
 - **Invalidation**: cache is fully cleared after saving a position (other books' positions shift). The ↻ button in the widget also clears cache and re-fetches
 
 ## How to Test

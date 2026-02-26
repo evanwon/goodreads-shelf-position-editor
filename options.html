@@ -62,12 +62,13 @@
   <h2>GR Shelf Position Editor</h2>
   <label for="ttl">Cache TTL (hours)</label>
   <div class="field">
-    <input type="number" id="ttl" min="0" step="0.5" value="4">
+    <input type="number" id="ttl" min="0" step="1" value="168">
     <button id="save">Save</button>
     <span id="status" class="status"></span>
   </div>
   <p class="hint">
-    How long to keep cached shelf positions before re-fetching.
+    Shelf positions are cached locally to avoid slow re-fetching (default: 168 hours / 1 week).
+    If you reorder your shelf on goodreads.com, use the ↻ button on the widget to refresh, or lower this value.
     Set to 0 to always fetch fresh data (slower).
   </p>
   <script src="options.js"></script>

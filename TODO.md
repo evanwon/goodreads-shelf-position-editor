@@ -20,11 +20,11 @@ Prioritized by impact. See the full review in `.claude/plans/reflective-scribbli
   Move `maxPages = 50`, `per_page=100`, `200ms` delay, `2000ms` flash to named constants
   at the top of the IIFE (e.g. `MAX_SHELF_PAGES`, `ITEMS_PER_PAGE`, etc.)
 
-- [ ] **Add user-facing error states** (`content.js`)
+- [x] **Add user-facing error states** (`content.js`)
   Show a "not on To Read shelf" indicator for books that aren't shelved.
   Add a retry prompt when network requests fail (beyond the basic CSRF notice already added).
 
-- [ ] **Add cache refresh mechanism** (`content.js:115-141`)
+- [x] **Add cache refresh mechanism** (`content.js:115-141`)
   Cache has no TTL or manual clearing. Options:
   - Add a "refresh" button to the widget
   - Add a cache TTL (e.g. 1 hour)

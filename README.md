@@ -39,7 +39,7 @@ The extension will remain active until you restart Firefox.
 4. Injects a position input widget on the page
 5. Saves position changes via Goodreads' internal API
 
-First load may take a few seconds (fetches your shelf data). Subsequent visits to any book page are instant thanks to localStorage caching. Cache expires after 4 hours by default — configurable in the extension's options (Add-ons Manager → GR Shelf Position Editor → Options).
+First load may take a few seconds (fetches your shelf data). Subsequent visits to any book page are instant thanks to localStorage caching. Cache expires after 1 week by default — configurable in the extension's options (Add-ons Manager → GR Shelf Position Editor → Options). If you reorder your shelf on goodreads.com, click the ↻ button on the widget to refresh.
 
 ## Requirements
 

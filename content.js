@@ -4,7 +4,7 @@
   const LOG = (...args) => console.log("[GR Shelf Position]", ...args);
 
   // --- Cache TTL (configurable via extension options) ---
-  const DEFAULT_TTL_HOURS = 4;
+  const DEFAULT_TTL_HOURS = 168;
   let cacheTtlMs = DEFAULT_TTL_HOURS * 60 * 60 * 1000;
 
   browser.storage.local.get("cacheTtlHours").then((result) => {
