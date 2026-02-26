@@ -17,10 +17,15 @@
     }
   ],
   "permissions": [
+    "storage",
     "*://www.goodreads.com/",
     "*://www.goodreads.com/review/list/*",
     "*://www.goodreads.com/shelf/move_batch/*"
   ],
+  "options_ui": {
+    "page": "options.html",
+    "browser_style": true
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "gr-shelf-position-editor@evanw.com",

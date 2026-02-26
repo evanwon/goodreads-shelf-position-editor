@@ -1,6 +1,6 @@
 /* Goodreads Book Position Widget */
 #gr-book-pos-widget {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   margin: 10px 0;
@@ -76,4 +76,34 @@
 .gr-book-pos-save:disabled {
   background-color: #999;
   cursor: not-allowed;
+}
+
+.gr-book-pos-refresh {
+  padding: 4px 8px;
+  background-color: transparent;
+  color: #382110;
+  border: 1px solid #D8D8D2;
+  border-radius: 3px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gr-book-pos-refresh:hover:not(:disabled) {
+  background-color: #E8E8E0;
+}
+
+.gr-book-pos-refresh:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+@keyframes gr-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.gr-book-pos-refresh.gr-book-pos-spinning {
+  animation: gr-spin 0.8s linear infinite;
 }

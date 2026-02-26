@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      color: #382110;
+      padding: 16px;
+      max-width: 420px;
+    }
+    h2 {
+      font-size: 16px;
+      margin: 0 0 12px;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: bold;
+    }
+    .field {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    input[type="number"] {
+      width: 64px;
+      padding: 4px 6px;
+      border: 1px solid #D8D8D2;
+      border-radius: 3px;
+      font-size: 14px;
+      text-align: center;
+    }
+    .hint {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    button {
+      padding: 6px 16px;
+      background-color: #409D69;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #357a54;
+    }
+    .status {
+      margin-left: 8px;
+      font-size: 13px;
+      color: #409D69;
+    }
+  </style>
+</head>
+<body>
+  <h2>GR Shelf Position Editor</h2>
+  <label for="ttl">Cache TTL (hours)</label>
+  <div class="field">
+    <input type="number" id="ttl" min="0" step="0.5" value="4">
+    <button id="save">Save</button>
+    <span id="status" class="status"></span>
+  </div>
+  <p class="hint">
+    How long to keep cached shelf positions before re-fetching.
+    Set to 0 to always fetch fresh data (slower).
+  </p>
+  <script src="options.js"></script>
+</body>
+</html>

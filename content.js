@@ -3,6 +3,17 @@
 
   const LOG = (...args) => console.log("[GR Shelf Position]", ...args);
 
+  // --- Cache TTL (configurable via extension options) ---
+  const DEFAULT_TTL_HOURS = 4;
+  let cacheTtlMs = DEFAULT_TTL_HOURS * 60 * 60 * 1000;
+
+  browser.storage.local.get("cacheTtlHours").then((result) => {
+    if (result.cacheTtlHours != null) {
+      cacheTtlMs = result.cacheTtlHours * 60 * 60 * 1000;
+      LOG("Cache TTL set to", result.cacheTtlHours, "hours");
+    }
+  });
+
   // Guard against double injection (SPA navigation can re-trigger content scripts)
   if (document.getElementById("gr-book-pos-widget")) return;
 
@@ -125,6 +136,16 @@
     try {
       const raw = localStorage.getItem(cacheKey(userId));
       if (!raw) return new Map();
+
+      // Check TTL
+      const ts = localStorage.getItem(cacheKey(userId) + "-ts");
+      if (cacheTtlMs > 0 && (!ts || Date.now() - Number(ts) > cacheTtlMs)) {
+        LOG("Cache expired — clearing");
+        localStorage.removeItem(cacheKey(userId));
+        localStorage.removeItem(cacheKey(userId) + "-ts");
+        return new Map();
+      }
+
       return new Map(Object.entries(JSON.parse(raw)));
     } catch (e) {
       LOG("Cache read failed:", e);
@@ -135,6 +156,7 @@
   function saveCache(userId, cache) {
     try {
       localStorage.setItem(cacheKey(userId), JSON.stringify(Object.fromEntries(cache)));
+      localStorage.setItem(cacheKey(userId) + "-ts", String(Date.now()));
     } catch (e) {
       LOG("Cache write failed:", e);
     }
@@ -348,9 +370,43 @@
       savePosition(input, saveBtn, userId, authToken);
     });
 
+    const refreshBtn = document.createElement("button");
+    refreshBtn.className = "gr-book-pos-refresh";
+    refreshBtn.textContent = "\u21BB";
+    refreshBtn.title = "Refresh position from shelf";
+
+    refreshBtn.addEventListener("click", async () => {
+      refreshBtn.disabled = true;
+      refreshBtn.classList.add("gr-book-pos-spinning");
+
+      localStorage.removeItem(cacheKey(userId));
+      localStorage.removeItem(cacheKey(userId) + "-ts");
+      LOG("Cache cleared — refreshing position");
+
+      try {
+        const result = await findShelfData(userId, reviewId);
+        if (result) {
+          input.value = result.position;
+          input.dataset.originalValue = result.position;
+          input.dataset.shelfId = result.shelfId;
+          input.classList.remove("gr-book-pos-changed", "gr-book-pos-error");
+          saveBtn.disabled = true;
+          LOG("Refreshed position:", result.position);
+        } else {
+          LOG("Refresh: book not found in shelf data");
+        }
+      } catch (err) {
+        LOG("Refresh failed:", err);
+      } finally {
+        refreshBtn.disabled = false;
+        refreshBtn.classList.remove("gr-book-pos-spinning");
+      }
+    });
+
     widget.appendChild(label);
     widget.appendChild(input);
     widget.appendChild(saveBtn);
+    widget.appendChild(refreshBtn);
 
     if (prepend && anchor.firstChild) {
       anchor.insertBefore(widget, anchor.firstChild);
@@ -421,13 +477,9 @@
         input.dataset.originalValue = val;
       }
 
-      // Update cache with new position
-      const cache = loadCache(userId);
-      const shelfEntry = cache.get(input.dataset.reviewId);
-      if (shelfEntry) {
-        shelfEntry.position = input.dataset.originalValue;
-        saveCache(userId, cache);
-      }
+      // Clear cache — other books' positions shifted, so cache is stale
+      localStorage.removeItem(cacheKey(userId));
+      localStorage.removeItem(cacheKey(userId) + "-ts");
 
       input.classList.remove("gr-book-pos-changed");
       input.classList.add("gr-book-pos-saved");
