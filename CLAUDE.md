@@ -27,7 +27,7 @@ content.js runs on every `/book/show/*` page and executes these steps:
 3. **Discover user ID + CSRF token** — tries current page inline scripts (`CurrentUserStore`), falls back to fetching homepage. User ID is cached in localStorage (`gr-book-pos-userid`)
 4. **Phase 1 — title search**: `GET /review/list/{USER_ID}?shelf=to-read&view=table&search[query]={TITLE}` to confirm book is on shelf and extract review ID. Matches by book ID in href (not title string) to handle duplicates
 5. **Phase 2 — shelf data lookup**: Checks localStorage cache (`gr-pos-fixer-{USER_ID}`, shared with position-fixer extension). On cache miss, paginates `GET /review/list/{USER_ID}?shelf=to-read&sort=date_added&order=d&per_page=100&page=N&view=table` to find shelf ID + position (search results don't include position inputs; non-search views do)
-6. **Inject widget** near shelf buttons: `To Read position: [ N ] [Save] [↻]`
+6. **Inject widget** near shelf buttons — shows progressive loading states, then either the position editor (`Position: [ N ] [Save] [↻]`), a "not on shelf" message, or an error
 7. **Save**: `POST /shelf/move_batch/{USER_ID}` with `positions[{SHELF_ID}]=N` body. Response may be JSON or HTML; both are handled
 
 ## Key Technical Details
@@ -51,7 +51,7 @@ content.js runs on every `/book/show/*` page and executes these steps:
 ## How to Test
 
 1. `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `manifest.json`
-2. Navigate to a book on your To Read shelf → widget appears with current position
-3. Navigate to a book NOT on your shelf → no widget, console shows "Book not found on To Read shelf"
+2. Navigate to a book on your To Read shelf → widget shows "Loading…" then position
+3. Navigate to a book NOT on your shelf → widget shows "Not on your To Read shelf"
 4. Change position, press Enter or click Save → green flash, position persists on refresh
 5. Console logs prefixed with `[GR Shelf Position]`

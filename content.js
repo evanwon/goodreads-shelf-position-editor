@@ -222,7 +222,7 @@
     return rows.length;
   }
 
-  async function findShelfData(userId, reviewId) {
+  async function findShelfData(userId, reviewId, onProgress) {
     // Check cache first
     const cache = loadCache(userId);
     LOG("Cache has", cache.size, "entries");
@@ -241,6 +241,7 @@
     let result = null;
 
     for (let page = 1; page <= maxPages; page++) {
+      if (onProgress) onProgress(page);
       const url =
         `https://www.goodreads.com/review/list/${userId}?shelf=to-read` +
         `&sort=date_added&order=d&per_page=100&page=${page}&view=table`;
@@ -275,65 +276,83 @@
     return result;
   }
 
-  // --- Step 6: Inject notice (degraded state) ---
+  // --- Step 6: Widget lifecycle (loading → loaded / empty / error) ---
 
-  function injectNotice(message) {
-    if (document.getElementById("gr-book-pos-widget")) return;
-    const anchor =
-      document.querySelector(".BookActions") ||
-      document.querySelector(".wtrButtonContainer") ||
-      document.querySelector("[data-testid='shelfButton']") ||
-      document.querySelector(".BookPage__bookActions") ||
-      document.querySelector("main") ||
-      document.body;
-
-    const widget = document.createElement("div");
-    widget.id = "gr-book-pos-widget";
-    const label = document.createElement("span");
-    label.className = "gr-book-pos-label";
-    label.textContent = message;
-    widget.appendChild(label);
-    anchor.insertAdjacentElement("afterend", widget);
-    LOG("Notice injected:", message);
+  function clearChildren(el) {
+    while (el.firstChild) el.removeChild(el.firstChild);
   }
 
-  // --- Step 7: Inject widget ---
-
-  function injectWidget(shelfId, position, userId, authToken, reviewId) {
-    // Find a suitable anchor point on the book page
+  function findAnchor() {
     const anchor =
       document.querySelector(".BookActions") ||
       document.querySelector(".wtrButtonContainer") ||
       document.querySelector("[data-testid='shelfButton']") ||
       document.querySelector(".BookPage__bookActions");
 
-    if (!anchor) {
-      // Last resort: look for the "Want to Read" button area
-      const wtrBtn = document.querySelector(
-        'button[aria-label*="Want to Read"], button[aria-label*="want to read"]'
-      );
-      if (wtrBtn) {
-        const parent = wtrBtn.closest("div");
-        if (parent) return buildAndInsert(parent, shelfId, position, userId, authToken, reviewId);
-      }
-      LOG("Could not find anchor element for widget. Injecting into page.");
-      const main =
-        document.querySelector("main") ||
-        document.querySelector('[class*="BookPage"]') ||
-        document.body;
-      return buildAndInsert(main, shelfId, position, userId, authToken, reviewId, true);
+    if (anchor) return { el: anchor, prepend: false };
+
+    // Last resort: look for the "Want to Read" button area
+    const wtrBtn = document.querySelector(
+      'button[aria-label*="Want to Read"], button[aria-label*="want to read"]'
+    );
+    if (wtrBtn) {
+      const parent = wtrBtn.closest("div");
+      if (parent) return { el: parent, prepend: false };
     }
 
-    return buildAndInsert(anchor, shelfId, position, userId, authToken, reviewId);
+    LOG("Could not find anchor element for widget. Injecting into page.");
+    const main =
+      document.querySelector("main") ||
+      document.querySelector('[class*="BookPage"]') ||
+      document.body;
+    return { el: main, prepend: true };
   }
 
-  function buildAndInsert(anchor, shelfId, position, userId, authToken, reviewId, prepend) {
+  function createNameElement() {
+    const name = document.createElement("span");
+    name.className = "gr-book-pos-name";
+    name.textContent = "Shelf Position";
+    return name;
+  }
+
+  function injectLoadingWidget() {
+    const { el: anchor, prepend } = findAnchor();
+
     const widget = document.createElement("div");
     widget.id = "gr-book-pos-widget";
 
+    const spinner = document.createElement("span");
+    spinner.className = "gr-book-pos-spinner";
+
+    const status = document.createElement("span");
+    status.className = "gr-book-pos-status";
+    status.textContent = "Loading\u2026";
+
+    widget.appendChild(createNameElement());
+    widget.appendChild(spinner);
+    widget.appendChild(status);
+
+    if (prepend && anchor.firstChild) {
+      anchor.insertBefore(widget, anchor.firstChild);
+    } else {
+      anchor.insertAdjacentElement("afterend", widget);
+    }
+
+    LOG("Loading widget injected");
+    return widget;
+  }
+
+  function updateWidgetStatus(widget, text) {
+    const status = widget.querySelector(".gr-book-pos-status");
+    if (status) status.textContent = text;
+  }
+
+  function transitionToLoaded(widget, shelfId, position, userId, authToken, reviewId) {
+    clearChildren(widget);
+
     const label = document.createElement("span");
     label.className = "gr-book-pos-label";
-    label.textContent = "To Read position:";
+    label.textContent = "Position:";
 
     const input = document.createElement("input");
     input.type = "number";
@@ -403,18 +422,45 @@
       }
     });
 
+    widget.appendChild(createNameElement());
     widget.appendChild(label);
     widget.appendChild(input);
     widget.appendChild(saveBtn);
     widget.appendChild(refreshBtn);
 
-    if (prepend && anchor.firstChild) {
-      anchor.insertBefore(widget, anchor.firstChild);
-    } else {
-      anchor.insertAdjacentElement("afterend", widget);
-    }
+    LOG("Widget loaded, current position:", position);
+  }
 
-    LOG("Widget injected, current position:", position);
+  function transitionToNotOnShelf(widget) {
+    clearChildren(widget);
+    widget.classList.add("gr-book-pos-empty");
+
+    const label = document.createElement("span");
+    label.className = "gr-book-pos-label";
+    label.textContent = "Not on your To Read shelf";
+
+    const desc = document.createElement("span");
+    desc.className = "gr-book-pos-empty-desc";
+    desc.textContent = "\u00B7 Shows position for books you\u2019ve shelved as To Read";
+
+    widget.appendChild(createNameElement());
+    widget.appendChild(label);
+    widget.appendChild(desc);
+
+    LOG("Widget: not on shelf");
+  }
+
+  function transitionToError(widget, message) {
+    clearChildren(widget);
+
+    const msg = document.createElement("span");
+    msg.className = "gr-book-pos-error-msg";
+    msg.textContent = message;
+
+    widget.appendChild(createNameElement());
+    widget.appendChild(msg);
+
+    LOG("Widget error:", message);
   }
 
   // --- Step 8: Save position ---
@@ -506,22 +552,24 @@
       return;
     }
 
-    const auth = await discoverUserIdAndCsrf();
-    if (!auth || !auth.userId) {
-      LOG("No user ID found — user may not be logged in. Skipping.");
-      return;
-    }
-    if (!auth.csrf) {
-      LOG("No CSRF token found. Skipping.");
-      injectNotice("Could not load shelf data — try refreshing the page.");
-      return;
-    }
-
-    const { userId, csrf: authToken } = auth;
-    LOG("User ID:", userId, "— looking up shelf position...");
+    const widget = injectLoadingWidget();
 
     try {
+      const auth = await discoverUserIdAndCsrf();
+      if (!auth || !auth.userId) {
+        transitionToError(widget, "Not logged in \u2014 log in to Goodreads to use this extension");
+        return;
+      }
+      if (!auth.csrf) {
+        transitionToError(widget, "Could not load shelf data \u2014 try refreshing the page.");
+        return;
+      }
+
+      const { userId, csrf: authToken } = auth;
+      LOG("User ID:", userId, "\u2014 looking up shelf position...");
+
       // Phase 1: Title search to confirm book is on shelf and get review ID
+      updateWidgetStatus(widget, "Searching shelf\u2026");
       let reviewId = await findReviewId(userId, bookTitle);
 
       // Retry with cleaned title if needed
@@ -535,25 +583,30 @@
 
       if (!reviewId) {
         LOG("Book not found on To Read shelf.");
+        transitionToNotOnShelf(widget);
         return;
       }
 
       LOG("Review ID:", reviewId);
 
       // Phase 2: Paginate non-search shelf view to get shelf ID + position
-      const result = await findShelfData(userId, reviewId);
+      updateWidgetStatus(widget, "Loading position\u2026");
+      const result = await findShelfData(userId, reviewId, (page) => {
+        updateWidgetStatus(widget, "Loading position\u2026 page " + page);
+      });
 
       if (!result) {
         LOG("Could not find shelf data for review", reviewId,
-          "— book is on shelf but position data not found (shelf may exceed pagination limit)");
-        injectNotice("On your To Read shelf, but position data could not be loaded.");
+          "\u2014 book is on shelf but position data not found (shelf may exceed pagination limit)");
+        transitionToError(widget, "On your To Read shelf, but position data could not be loaded.");
         return;
       }
 
-      LOG("Found — shelfId:", result.shelfId, "position:", result.position);
-      injectWidget(result.shelfId, result.position, userId, authToken, reviewId);
+      LOG("Found \u2014 shelfId:", result.shelfId, "position:", result.position);
+      transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId);
     } catch (err) {
       LOG("Error:", err);
+      transitionToError(widget, "Something went wrong \u2014 try refreshing the page.");
     }
   })();
 })();

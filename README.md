@@ -6,11 +6,10 @@ If you maintain a large To Read list sorted by position (priority), Goodreads ma
 
 ## What It Does
 
-When you visit a book page on Goodreads (e.g. `goodreads.com/book/show/12345`), the extension checks if the book is on your To Read shelf. If it is, a widget appears:
+When you visit a book page on Goodreads (e.g. `goodreads.com/book/show/12345`), a small widget appears showing loading progress, then:
 
-```
-To Read position: [ 42 ] [Save] [↻]
-```
+- **On your shelf**: `SHELF POSITION — Position: [ 42 ] [Save] [↻]`
+- **Not on your shelf**: `SHELF POSITION — Not on your To Read shelf`
 
 Change the number, hit Enter or click Save, and you're done. Click ↻ to refresh the position from your shelf.
 
@@ -27,8 +26,9 @@ The extension will remain active until you restart Firefox.
 ## Usage
 
 - Visit any book page on `goodreads.com`
-- If the book is on your To Read shelf, the position widget appears automatically
-- Edit the position number and press **Enter** or click **Save**
+- The widget appears immediately with loading progress
+- If the book is on your To Read shelf, edit the position and press **Enter** or click **Save**
+- If the book is not on your shelf, the widget tells you
 - Green flash = saved successfully
 
 ## How It Works

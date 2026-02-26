@@ -1,15 +1,27 @@
 /* Goodreads Book Position Widget */
 #gr-book-pos-widget {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   margin: 10px 0;
   padding: 8px 12px;
   background-color: #F4F1EA;
   border: 1px solid #D8D8D2;
+  border-left: 3px solid #409D69;
   border-radius: 4px;
   font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 13px;
+}
+
+.gr-book-pos-name {
+  width: 100%;
+  color: #5C4B3A;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 .gr-book-pos-label {
@@ -106,4 +118,45 @@
 
 .gr-book-pos-refresh.gr-book-pos-spinning {
   animation: gr-spin 0.8s linear infinite;
+}
+
+/* Loading & status states */
+.gr-book-pos-status {
+  color: #666;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.gr-book-pos-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #D8D8D2;
+  border-top-color: #409D69;
+  border-radius: 50%;
+  animation: gr-spin 0.8s linear infinite;
+}
+
+/* Empty state (not on shelf) */
+.gr-book-pos-empty {
+  background-color: #F9F8F4;
+  border-color: #E8E8E0;
+}
+
+.gr-book-pos-empty .gr-book-pos-label {
+  font-weight: normal;
+  color: #666;
+}
+
+.gr-book-pos-empty-desc {
+  color: #999;
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+/* Error state */
+.gr-book-pos-error-msg {
+  color: #c62828;
+  font-weight: normal;
+  white-space: nowrap;
 }
