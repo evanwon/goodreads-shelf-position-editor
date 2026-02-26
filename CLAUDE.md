@@ -6,12 +6,11 @@ Firefox WebExtension that shows and edits your To Read shelf position directly o
 
 ```
 gr-shelf-position-editor/
-├── gr-shelf-position-editor/   # The Firefox extension
-│   ├── manifest.json           # Manifest V2, matches /book/show/* pages
-│   ├── content.js              # All logic: discover user, find book, inject widget, save
-│   ├── content.css             # Widget styles (Goodreads color palette)
-│   └── icons/icon-48.svg
-├── _archive/                   # Previous approaches (gitignored)
+├── manifest.json       # Manifest V2, matches /book/show/* pages
+├── content.js          # All logic: discover user, find book, inject widget, save
+├── content.css         # Widget styles (Goodreads color palette)
+├── icons/icon-48.svg
+├── _archive/           # Previous approaches (gitignored)
 ├── .gitignore
 ├── CLAUDE.md
 └── README.md
@@ -48,7 +47,7 @@ content.js runs on every `/book/show/*` page and executes these steps:
 
 ## How to Test
 
-1. `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `gr-shelf-position-editor/manifest.json`
+1. `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `manifest.json`
 2. Navigate to a book on your To Read shelf → widget appears with current position
 3. Navigate to a book NOT on your shelf → no widget, console shows "Book not found on To Read shelf"
 4. Change position, press Enter or click Save → green flash, position persists on refresh

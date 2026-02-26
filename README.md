@@ -20,7 +20,7 @@ This is a temporary add-on (not published to AMO).
 
 1. Open Firefox and go to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on**
-3. Select `gr-shelf-position-editor/manifest.json`
+3. Select `manifest.json` from this repo
 
 The extension will remain active until you restart Firefox.
 
