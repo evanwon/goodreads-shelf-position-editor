@@ -1,4 +1,4 @@
-# Goodreads Book Position
+# GR Shelf Position Editor
 
 A Firefox extension that lets you view and set your **To Read shelf position** directly from any Goodreads book page.
 
@@ -20,7 +20,7 @@ This is a temporary add-on (not published to AMO).
 
 1. Open Firefox and go to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on**
-3. Select `goodreads-book-position/manifest.json`
+3. Select `gr-shelf-position-editor/manifest.json`
 
 The extension will remain active until you restart Firefox.
 

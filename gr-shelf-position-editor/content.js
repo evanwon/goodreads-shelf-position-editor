@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  const LOG = (...args) => console.log("[GR Book Position]", ...args);
+  const LOG = (...args) => console.log("[GR Shelf Position]", ...args);
 
   // --- Step 1: Extract book ID from URL ---
 
