@@ -146,12 +146,12 @@
 .gr-book-pos-empty .gr-book-pos-label {
   font-weight: normal;
   color: #666;
+  white-space: normal;
 }
 
 .gr-book-pos-empty-desc {
   color: #999;
   font-weight: normal;
-  white-space: nowrap;
 }
 
 /* Error state */
