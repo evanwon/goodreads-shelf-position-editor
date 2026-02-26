@@ -1,0 +1,20 @@
+{
+  "manifest_version": 2,
+  "name": "Goodreads Book Position",
+  "version": "1.0",
+  "description": "Shows and edits your To Read shelf position directly on Goodreads book pages.",
+  "icons": {
+    "48": "icons/icon-48.svg"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.goodreads.com/book/show/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "*://www.goodreads.com/*"
+  ]
+}

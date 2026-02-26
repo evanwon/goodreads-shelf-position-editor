@@ -1,0 +1,79 @@
+/* Goodreads Book Position Widget */
+#gr-book-pos-widget {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 8px 12px;
+  background-color: #F4F1EA;
+  border: 1px solid #D8D8D2;
+  border-radius: 4px;
+  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 13px;
+}
+
+.gr-book-pos-label {
+  color: #382110;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.gr-book-pos-input {
+  width: 56px;
+  padding: 4px 6px;
+  border: 1px solid #D8D8D2;
+  border-radius: 3px;
+  font-size: 13px;
+  text-align: center;
+  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #fff;
+  -moz-appearance: textfield;
+}
+
+.gr-book-pos-input::-webkit-inner-spin-button,
+.gr-book-pos-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.gr-book-pos-input:focus {
+  border-color: #00635D;
+  outline: none;
+  box-shadow: 0 0 3px rgba(0, 99, 93, 0.3);
+}
+
+.gr-book-pos-input.gr-book-pos-changed {
+  background-color: #FFFDE7;
+}
+
+.gr-book-pos-input.gr-book-pos-saved {
+  background-color: #E8F5E9;
+  transition: background-color 0.3s;
+}
+
+.gr-book-pos-input.gr-book-pos-error {
+  background-color: #FFEBEE;
+  border-color: #c62828;
+}
+
+.gr-book-pos-save {
+  padding: 4px 12px;
+  background-color: #409D69;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 13px;
+  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gr-book-pos-save:hover:not(:disabled) {
+  background-color: #357a54;
+}
+
+.gr-book-pos-save:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+}

@@ -1,0 +1,475 @@
+(function () {
+  "use strict";
+
+  const LOG = (...args) => console.log("[GR Book Position]", ...args);
+
+  // --- Step 1: Extract book ID from URL ---
+
+  const bookIdMatch = window.location.pathname.match(/\/book\/show\/(\d+)/);
+  if (!bookIdMatch) return;
+  const bookId = bookIdMatch[1];
+  LOG("Book ID:", bookId);
+
+  // --- Step 2: Extract book title ---
+
+  function getBookTitle() {
+    let title = null;
+
+    // Primary: og:title meta tag (stable across layouts)
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) {
+      const content = ogTitle.getAttribute("content");
+      if (content) title = content.trim();
+    }
+
+    // Fallback: page <title> — "Book Title by Author Name | Goodreads"
+    if (!title && document.title) {
+      const titleMatch = document.title.match(/^(.+?)\s+by\s+/);
+      if (titleMatch) title = titleMatch[1].trim();
+    }
+
+    if (!title) return null;
+
+    // Strip trailing ellipsis — og:title often truncates long titles
+    title = title.replace(/\u2026$/, "").replace(/\.\.\.$/, "").trim();
+
+    return title;
+  }
+
+  // --- Step 3: Discover user ID + CSRF token ---
+  // Modern Goodreads book pages don't include CurrentUserStore in inline scripts,
+  // so we first check the current page, then fall back to fetching the homepage.
+
+  function getUserIdFromPage(doc) {
+    const scripts = doc.querySelectorAll("script");
+    for (const script of scripts) {
+      const text = script.textContent;
+      const match = text.match(
+        /CurrentUserStore\.initializeWith\(\s*\{[^}]*"profileUrl"\s*:\s*"\/user\/show\/(\d+)/
+      );
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  function getCsrfFromPage(doc) {
+    const meta = doc.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute("content") : null;
+  }
+
+  const USER_ID_CACHE_KEY = "gr-book-pos-userid";
+
+  async function discoverUserIdAndCsrf() {
+    // Try current page first
+    let userId = getUserIdFromPage(document);
+    let csrf = getCsrfFromPage(document);
+    if (userId && csrf) {
+      LOG("Found user ID + CSRF on current page");
+      localStorage.setItem(USER_ID_CACHE_KEY, userId);
+      return { userId, csrf };
+    }
+
+    // Check cached user ID — avoids slow homepage fetch on repeat visits.
+    // CSRF still needed from homepage, but we can skip parsing for user ID.
+    const cachedUserId = localStorage.getItem(USER_ID_CACHE_KEY);
+    if (cachedUserId) {
+      LOG("User ID from cache:", cachedUserId);
+      userId = cachedUserId;
+    }
+
+    // Need CSRF token (and possibly user ID) from homepage
+    if (!csrf) {
+      LOG(userId
+        ? "Fetching homepage for CSRF token..."
+        : "Fetching homepage to discover user ID (this may take a few seconds)...");
+      try {
+        const t0 = Date.now();
+        const resp = await fetch("https://www.goodreads.com/", {
+          credentials: "same-origin",
+        });
+        if (!resp.ok) throw new Error(`Homepage HTTP ${resp.status}`);
+        const html = await resp.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        LOG(`Homepage fetched in ${Date.now() - t0}ms`);
+
+        if (!userId) userId = getUserIdFromPage(doc);
+        csrf = getCsrfFromPage(doc);
+      } catch (err) {
+        LOG("Homepage fetch failed:", err);
+        return null;
+      }
+    }
+
+    if (userId) {
+      localStorage.setItem(USER_ID_CACHE_KEY, userId);
+      LOG("User ID:", userId);
+      return { userId, csrf };
+    }
+
+    return null;
+  }
+
+  // --- Step 4: Cache layer (localStorage) ---
+  // Stores reviewId -> { shelfId, position } for all books seen during pagination.
+  // On subsequent visits to any book page, cache is checked first — skipping phase 2.
+  // Shared with goodreads-position-fixer if same user.
+
+  function cacheKey(userId) {
+    return `gr-pos-fixer-${userId}`;
+  }
+
+  function loadCache(userId) {
+    try {
+      const raw = localStorage.getItem(cacheKey(userId));
+      if (!raw) return new Map();
+      return new Map(Object.entries(JSON.parse(raw)));
+    } catch (e) {
+      LOG("Cache read failed:", e);
+      return new Map();
+    }
+  }
+
+  function saveCache(userId, cache) {
+    try {
+      localStorage.setItem(cacheKey(userId), JSON.stringify(Object.fromEntries(cache)));
+    } catch (e) {
+      LOG("Cache write failed:", e);
+    }
+  }
+
+  // --- Step 5: Find book on To Read shelf ---
+  // Two-phase approach:
+  //   Phase 1: Title search to confirm book is on shelf + get review ID (fast, 1 request)
+  //   Phase 2: Check cache, then paginate non-search shelf view to get shelf ID + position
+  //            (search results don't include position inputs)
+
+  function cleanTitle(title) {
+    // Strip series info in parens, e.g. "The Hobbit (The Lord of the Rings, #0)"
+    return title.replace(/\s*\([^)]*#\d+[^)]*\)\s*$/, "").trim();
+  }
+
+  async function findReviewId(userId, searchTitle) {
+    const url =
+      `https://www.goodreads.com/review/list/${userId}?shelf=to-read` +
+      `&view=table&search[query]=${encodeURIComponent(searchTitle)}`;
+
+    LOG("Phase 1 — searching shelf for:", searchTitle);
+
+    const resp = await fetch(url, { credentials: "same-origin" });
+    if (!resp.ok) throw new Error(`Shelf search HTTP ${resp.status}`);
+
+    const html = await resp.text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const rows = doc.querySelectorAll("#booksBody tr.bookalike.review");
+    for (const row of rows) {
+      const bookLink = row.querySelector("td.field.title a");
+      if (!bookLink) continue;
+      const href = bookLink.getAttribute("href") || "";
+      if (!href.match(new RegExp(`/book/show/${bookId}\\b`))) continue;
+
+      // Extract review ID from row id="review_{ID}" or checkbox
+      const rowMatch = row.id.match(/^review_(\d+)$/);
+      if (rowMatch) return rowMatch[1];
+
+      const checkbox = row.querySelector('input[name^="reviews["]');
+      if (checkbox) {
+        const cbMatch = checkbox.name.match(/^reviews\[(\d+)\]$/);
+        if (cbMatch) return cbMatch[1];
+      }
+    }
+
+    return null;
+  }
+
+  function parsePageRows(doc, cache) {
+    const rows = doc.querySelectorAll("#booksBody tr.bookalike.review");
+    rows.forEach((row) => {
+      const rowMatch = row.id.match(/^review_(\d+)$/);
+      if (!rowMatch) return;
+      const revId = rowMatch[1];
+      const posInput = row.querySelector('input[name^="positions["]');
+      if (!posInput) return;
+      const nameMatch = posInput.name.match(/^positions\[(\d+)\]$/);
+      if (!nameMatch) return;
+      cache.set(revId, { shelfId: nameMatch[1], position: posInput.value || "" });
+    });
+    return rows.length;
+  }
+
+  async function findShelfData(userId, reviewId) {
+    // Check cache first
+    const cache = loadCache(userId);
+    LOG("Cache has", cache.size, "entries");
+
+    if (cache.has(reviewId)) {
+      LOG("Phase 2 — cache hit for review", reviewId);
+      return cache.get(reviewId);
+    }
+
+    LOG("Phase 2 — paginating shelf for review", reviewId);
+
+    // Paginate the shelf sorted by date_added (newest first) — recently added
+    // books appear on page 1, and position inputs are present in non-search views.
+    // Cache ALL rows seen so future book pages are instant.
+    const maxPages = 50;
+    let result = null;
+
+    for (let page = 1; page <= maxPages; page++) {
+      const url =
+        `https://www.goodreads.com/review/list/${userId}?shelf=to-read` +
+        `&sort=date_added&order=d&per_page=100&page=${page}&view=table`;
+
+      const resp = await fetch(url, { credentials: "same-origin" });
+      if (!resp.ok) throw new Error(`Shelf page ${page} HTTP ${resp.status}`);
+
+      const html = await resp.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+
+      const rowCount = parsePageRows(doc, cache);
+      if (rowCount === 0) break;
+
+      if (cache.has(reviewId) && !result) {
+        result = cache.get(reviewId);
+        LOG("Found on page", page);
+        // Keep paginating to fill cache, but stop after this page
+        saveCache(userId, cache);
+        return result;
+      }
+
+      LOG("Page", page, "—", rowCount, "rows, not found yet");
+
+      // Small delay between pages to be polite
+      if (page < maxPages) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    // Save whatever we cached even if book wasn't found
+    saveCache(userId, cache);
+    return result;
+  }
+
+  // --- Step 5: Inject widget ---
+
+  function injectWidget(shelfId, position, userId, authToken, reviewId) {
+    // Find a suitable anchor point on the book page
+    const anchor =
+      document.querySelector(".BookActions") ||
+      document.querySelector(".wtrButtonContainer") ||
+      document.querySelector("[data-testid='shelfButton']") ||
+      document.querySelector(".BookPage__bookActions");
+
+    if (!anchor) {
+      // Last resort: look for the "Want to Read" button area
+      const wtrBtn = document.querySelector(
+        'button[aria-label*="Want to Read"], button[aria-label*="want to read"]'
+      );
+      if (wtrBtn) {
+        const parent = wtrBtn.closest("div");
+        if (parent) return buildAndInsert(parent, shelfId, position, userId, authToken, reviewId);
+      }
+      LOG("Could not find anchor element for widget. Injecting into page.");
+      const main =
+        document.querySelector("main") ||
+        document.querySelector('[class*="BookPage"]') ||
+        document.body;
+      return buildAndInsert(main, shelfId, position, userId, authToken, reviewId, true);
+    }
+
+    return buildAndInsert(anchor, shelfId, position, userId, authToken, reviewId);
+  }
+
+  function buildAndInsert(anchor, shelfId, position, userId, authToken, reviewId, prepend) {
+    const widget = document.createElement("div");
+    widget.id = "gr-book-pos-widget";
+
+    const label = document.createElement("span");
+    label.className = "gr-book-pos-label";
+    label.textContent = "To Read position:";
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "1";
+    input.className = "gr-book-pos-input";
+    input.value = position;
+    input.dataset.shelfId = shelfId;
+    input.dataset.originalValue = position;
+    input.dataset.reviewId = reviewId;
+    input.placeholder = "#";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "gr-book-pos-save";
+    saveBtn.textContent = "Save";
+    saveBtn.disabled = true;
+
+    input.addEventListener("input", () => {
+      const changed = input.value !== input.dataset.originalValue;
+      saveBtn.disabled = !changed;
+      input.classList.toggle("gr-book-pos-changed", changed);
+      input.classList.remove("gr-book-pos-saved", "gr-book-pos-error");
+    });
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (!saveBtn.disabled) savePosition(input, saveBtn, userId, authToken);
+      }
+    });
+
+    saveBtn.addEventListener("click", () => savePosition(input, saveBtn, userId, authToken));
+
+    widget.appendChild(label);
+    widget.appendChild(input);
+    widget.appendChild(saveBtn);
+
+    if (prepend && anchor.firstChild) {
+      anchor.insertBefore(widget, anchor.firstChild);
+    } else {
+      anchor.insertAdjacentElement("afterend", widget);
+    }
+
+    LOG("Widget injected, current position:", position);
+  }
+
+  // --- Step 6: Save position ---
+
+  async function savePosition(input, saveBtn, userId, authToken) {
+    const val = input.value.trim();
+    if (val !== "" && (!/^\d+$/.test(val) || parseInt(val, 10) < 1)) {
+      input.classList.add("gr-book-pos-error");
+      return;
+    }
+
+    const shelfId = input.dataset.shelfId;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+
+    const params = new URLSearchParams();
+    if (val !== "") {
+      params.append(`positions[${shelfId}]`, val);
+    }
+    params.append("view", "table");
+    params.append("authenticity_token", authToken);
+
+    try {
+      const resp = await fetch(
+        `https://www.goodreads.com/shelf/move_batch/${userId}`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "X-CSRF-Token": authToken,
+          },
+          body: params.toString(),
+        }
+      );
+
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      // Response may be JSON (with updated positions) or HTML (success but no data)
+      const text = await resp.text();
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        LOG("Response is not JSON (length:", text.length + "), treating as success");
+      }
+
+      // Update with server-confirmed position if available
+      if (data && data.shelves) {
+        const shelf = data.shelves.find((s) => String(s.id) === shelfId);
+        if (shelf) {
+          input.value = String(shelf.position);
+          input.dataset.originalValue = String(shelf.position);
+        } else {
+          input.dataset.originalValue = val;
+        }
+      } else {
+        // Server accepted but didn't return JSON — trust the value we sent
+        input.dataset.originalValue = val;
+      }
+
+      // Update cache with new position
+      const cache = loadCache(userId);
+      const shelfEntry = cache.get(input.dataset.reviewId);
+      if (shelfEntry) {
+        shelfEntry.position = input.dataset.originalValue;
+        saveCache(userId, cache);
+      }
+
+      input.classList.remove("gr-book-pos-changed");
+      input.classList.add("gr-book-pos-saved");
+      LOG("Position saved:", input.value);
+
+      setTimeout(() => input.classList.remove("gr-book-pos-saved"), 2000);
+    } catch (err) {
+      LOG("Save failed:", err);
+      input.classList.add("gr-book-pos-error");
+    } finally {
+      saveBtn.textContent = "Save";
+      saveBtn.disabled = input.value === input.dataset.originalValue;
+    }
+  }
+
+  // --- Run ---
+
+  (async function run() {
+    const bookTitle = getBookTitle();
+    LOG("Book title:", bookTitle);
+
+    if (!bookTitle) {
+      LOG("Could not determine book title. Skipping.");
+      return;
+    }
+
+    const auth = await discoverUserIdAndCsrf();
+    if (!auth || !auth.userId) {
+      LOG("No user ID found — user may not be logged in. Skipping.");
+      return;
+    }
+    if (!auth.csrf) {
+      LOG("No CSRF token found. Skipping.");
+      return;
+    }
+
+    const { userId, csrf: authToken } = auth;
+    LOG("User ID:", userId, "— looking up shelf position...");
+
+    try {
+      // Phase 1: Title search to confirm book is on shelf and get review ID
+      let reviewId = await findReviewId(userId, bookTitle);
+
+      // Retry with cleaned title if needed
+      if (!reviewId) {
+        const cleaned = cleanTitle(bookTitle);
+        if (cleaned !== bookTitle) {
+          LOG("Retrying with cleaned title:", cleaned);
+          reviewId = await findReviewId(userId, cleaned);
+        }
+      }
+
+      if (!reviewId) {
+        LOG("Book not found on To Read shelf.");
+        return;
+      }
+
+      LOG("Review ID:", reviewId);
+
+      // Phase 2: Paginate non-search shelf view to get shelf ID + position
+      const result = await findShelfData(userId, reviewId);
+
+      if (!result) {
+        LOG("Could not find shelf data for review", reviewId);
+        return;
+      }
+
+      LOG("Found — shelfId:", result.shelfId, "position:", result.position);
+      injectWidget(result.shelfId, result.position, userId, authToken, reviewId);
+    } catch (err) {
+      LOG("Error:", err);
+    }
+  })();
+})();
