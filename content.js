@@ -229,7 +229,7 @@
 
     if (cache.has(reviewId)) {
       LOG("Phase 2 — cache hit for review", reviewId);
-      return { ...cache.get(reviewId), totalBooks: cache.size };
+      return { ...cache.get(reviewId) };
     }
 
     LOG("Phase 2 — paginating shelf for review", reviewId);
@@ -256,7 +256,7 @@
       if (rowCount === 0) break;
 
       if (cache.has(reviewId) && !result) {
-        result = { ...cache.get(reviewId), totalBooks: cache.size };
+        result = { ...cache.get(reviewId) };
         LOG("Found on page", page);
         // Keep paginating to fill cache, but stop after this page
         saveCache(userId, cache);
@@ -273,7 +273,7 @@
 
     // Save whatever we cached even if book wasn't found
     saveCache(userId, cache);
-    return result ? { ...result, totalBooks: cache.size } : null;
+    return result ? result : null;
   }
 
   // --- Step 6: Widget lifecycle (loading → loaded / empty / error) ---
@@ -315,11 +315,9 @@
     return name;
   }
 
-  function injectLoadingWidget() {
-    const { el: anchor, prepend } = findAnchor();
-
-    const widget = document.createElement("div");
-    widget.id = "gr-book-pos-widget";
+  function transitionToLoading(widget) {
+    clearChildren(widget);
+    widget.classList.remove("gr-book-pos-empty");
 
     const spinner = document.createElement("span");
     spinner.className = "gr-book-pos-spinner";
@@ -331,6 +329,15 @@
     widget.appendChild(createNameElement());
     widget.appendChild(spinner);
     widget.appendChild(status);
+  }
+
+  function injectLoadingWidget() {
+    const { el: anchor, prepend } = findAnchor();
+
+    const widget = document.createElement("div");
+    widget.id = "gr-book-pos-widget";
+
+    transitionToLoading(widget);
 
     if (prepend && anchor.firstChild) {
       anchor.insertBefore(widget, anchor.firstChild);
@@ -347,7 +354,7 @@
     if (status) status.textContent = text;
   }
 
-  function transitionToLoaded(widget, shelfId, position, userId, authToken, reviewId, totalBooks) {
+  function transitionToLoaded(widget, shelfId, position, userId, authToken, reviewId) {
     clearChildren(widget);
 
     const label = document.createElement("span");
@@ -363,12 +370,6 @@
     input.dataset.originalValue = position;
     input.dataset.reviewId = reviewId;
     input.placeholder = "#";
-
-    const totalLabel = document.createElement("span");
-    totalLabel.className = "gr-book-pos-total";
-    if (totalBooks) {
-      totalLabel.textContent = `of ${totalBooks}`;
-    }
 
     const saveBtn = document.createElement("button");
     saveBtn.className = "gr-book-pos-save";
@@ -434,7 +435,6 @@
     widget.appendChild(createNameElement());
     widget.appendChild(label);
     widget.appendChild(input);
-    widget.appendChild(totalLabel);
     widget.appendChild(saveBtn);
     widget.appendChild(refreshBtn);
 
@@ -451,7 +451,7 @@
 
     const desc = document.createElement("span");
     desc.className = "gr-book-pos-empty-desc";
-    desc.textContent = "\u00B7 Add this book to your To Read shelf to set its position";
+    desc.textContent = "Add this book to your To Read shelf to set its position";
 
     widget.appendChild(createNameElement());
     widget.appendChild(label);
@@ -484,6 +484,109 @@
     }
 
     LOG("Widget error:", message);
+  }
+
+  // --- Step 7: Observe shelf button for changes ---
+  // When the widget shows "not on shelf", watch the shelf button container
+  // for structural DOM changes (e.g. user clicks "Want to Read"). On change,
+  // re-run the two-phase lookup to see if the book is now on the shelf.
+
+  function setupShelfObserver(widget, userId, authToken, bookTitle) {
+    const { el: anchor } = findAnchor();
+
+    // Don't observe fallback anchors — they aren't shelf button containers
+    if (
+      anchor === document.body ||
+      anchor === document.querySelector("main") ||
+      anchor === document.querySelector('[class*="BookPage"]')
+    ) {
+      LOG("No shelf button container found for observation");
+      return;
+    }
+
+    let debounceTimer = null;
+    let checking = false;
+    let recheckNeeded = false;
+    let userClicked = false;
+
+    // Only react to mutations after the user clicks in the shelf button area.
+    // This filters out Goodreads' own hydration/React renders which cause
+    // structural DOM changes on every page load.
+    anchor.addEventListener("click", () => { userClicked = true; });
+
+    async function recheck() {
+      checking = true;
+      LOG("Shelf button changed \u2014 rechecking\u2026");
+
+      transitionToLoading(widget);
+
+      // Clear cache — it won't have the newly added book
+      localStorage.removeItem(cacheKey(userId));
+      localStorage.removeItem(cacheKey(userId) + "-ts");
+
+      try {
+        // Phase 1: confirm book is now on shelf
+        updateWidgetStatus(widget, "Searching shelf\u2026");
+        let reviewId = await findReviewId(userId, bookTitle);
+
+        if (!reviewId) {
+          const cleaned = cleanTitle(bookTitle);
+          if (cleaned !== bookTitle) {
+            reviewId = await findReviewId(userId, cleaned);
+          }
+        }
+
+        if (!reviewId) {
+          LOG("Book still not on shelf after mutation");
+          transitionToNotOnShelf(widget);
+          return; // Keep observing
+        }
+
+        // Found on shelf — stop observing
+        observer.disconnect();
+        LOG("Book now on shelf, review ID:", reviewId);
+
+        // Phase 2: get shelf ID + position
+        updateWidgetStatus(widget, "Loading position\u2026");
+        const result = await findShelfData(userId, reviewId, (page) => {
+          updateWidgetStatus(widget, "Loading position\u2026 page " + page);
+        });
+
+        if (result) {
+          transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId);
+        } else {
+          transitionToError(widget, "On your To Read shelf, but position data could not be loaded.", () => {
+            localStorage.removeItem(cacheKey(userId));
+            localStorage.removeItem(cacheKey(userId) + "-ts");
+            window.location.reload();
+          });
+        }
+      } catch (err) {
+        LOG("Shelf re-check failed:", err);
+        transitionToNotOnShelf(widget);
+        // Keep observing — might be a transient error
+      } finally {
+        checking = false;
+        // If mutations arrived while checking, do one more pass
+        if (recheckNeeded) {
+          recheckNeeded = false;
+          recheck();
+        }
+      }
+    }
+
+    const observer = new MutationObserver(() => {
+      if (!userClicked) return;
+      if (checking) {
+        recheckNeeded = true;
+        return;
+      }
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(recheck, 1000);
+    });
+
+    observer.observe(anchor, { childList: true, subtree: true });
+    LOG("Observing shelf button for changes");
   }
 
   // --- Step 8: Save position ---
@@ -607,6 +710,7 @@
       if (!reviewId) {
         LOG("Book not found on To Read shelf.");
         transitionToNotOnShelf(widget);
+        setupShelfObserver(widget, userId, authToken, bookTitle);
         return;
       }
 
@@ -630,7 +734,7 @@
       }
 
       LOG("Found \u2014 shelfId:", result.shelfId, "position:", result.position);
-      transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId, result.totalBooks);
+      transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId);
     } catch (err) {
       LOG("Error:", err);
       transitionToError(widget, "Something went wrong", () => window.location.reload());
