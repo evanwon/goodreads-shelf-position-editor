@@ -205,6 +205,17 @@
       const href = bookLink.getAttribute("href") || "";
       if (!href.match(new RegExp(`/book/show/${bookId}\\b`))) continue;
 
+      // Goodreads search ignores the shelf= filter and returns books from
+      // all shelves. Verify this book is actually on to-read before accepting.
+      const shelfLinks = row.querySelectorAll("td.field.shelves a");
+      const onToRead = Array.from(shelfLinks).some(
+        (a) => a.textContent.trim() === "to-read"
+      );
+      if (!onToRead) {
+        LOG("Book found in search but not on to-read shelf — skipping");
+        continue;
+      }
+
       // Extract review ID from row id="review_{ID}" or checkbox
       const rowMatch = row.id.match(/^review_(\d+)$/);
       if (rowMatch) return rowMatch[1];
@@ -219,20 +230,26 @@
     return null;
   }
 
-  function parsePageRows(doc, cache) {
+  function parsePageRows(doc, cache, targetReviewId) {
     const rows = doc.querySelectorAll("#booksBody tr.bookalike.review");
+    let cached = 0;
     rows.forEach((row) => {
       const rowMatch = row.id.match(/^review_(\d+)$/);
       if (!rowMatch) return;
       const revId = rowMatch[1];
       const posInput = row.querySelector('input[name^="positions["]');
-      if (!posInput) return;
+      if (!posInput) {
+        if (revId === targetReviewId) LOG("Target review", revId, "found but has no position input");
+        return;
+      }
       const nameMatch = posInput.name.match(/^positions\[(\d+)\]$/);
       if (!nameMatch) return;
       const posValue = posInput.value || "";
       if (posValue !== "" && !isValidPosition(posValue)) return;
       cache.set(revId, { shelfId: nameMatch[1], position: posValue });
+      cached++;
     });
+    if (cached < rows.length) LOG("Parsed", rows.length, "rows,", cached, "cached,", rows.length - cached, "skipped");
     return rows.length;
   }
 
@@ -278,7 +295,7 @@
         }
       }
 
-      const rowCount = parsePageRows(doc, cache);
+      const rowCount = parsePageRows(doc, cache, reviewId);
       if (rowCount === 0) break;
 
       if (cache.has(reviewId) && !result) {
@@ -582,7 +599,7 @@
         updateWidgetStatus(widget, "Loading position\u2026");
         const result = await findShelfData(userId, reviewId, (page, totalPages) => {
           if (totalPages) {
-            const pct = Math.round((page / totalPages) * 100);
+            const pct = Math.min(100, Math.round((page / totalPages) * 100));
             updateWidgetStatus(widget, "Loading position\u2026 " + pct + "%");
           } else {
             updateWidgetStatus(widget, "Loading position\u2026");
@@ -757,7 +774,7 @@
       updateWidgetStatus(widget, "Loading position\u2026");
       const result = await findShelfData(userId, reviewId, (page, totalPages) => {
         if (totalPages) {
-          const pct = Math.round((page / totalPages) * 100);
+          const pct = Math.min(100, Math.round((page / totalPages) * 100));
           updateWidgetStatus(widget, "Loading position\u2026 " + pct + "%");
         } else {
           updateWidgetStatus(widget, "Loading position\u2026");
