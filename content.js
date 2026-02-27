@@ -427,7 +427,10 @@
 
     const refreshBtn = document.createElement("button");
     refreshBtn.className = "gr-book-pos-refresh";
-    refreshBtn.textContent = "\u21BB";
+    const refreshIcon = document.createElement("span");
+    refreshIcon.className = "gr-book-pos-refresh-icon";
+    refreshIcon.textContent = "\u21BB";
+    refreshBtn.appendChild(refreshIcon);
     refreshBtn.title = "Refresh position from shelf";
 
     refreshBtn.addEventListener("click", async () => {
@@ -499,7 +502,10 @@
     if (onRetry) {
       const retryBtn = document.createElement("button");
       retryBtn.className = "gr-book-pos-refresh";
-      retryBtn.textContent = "\u21BB";
+      const retryIcon = document.createElement("span");
+      retryIcon.className = "gr-book-pos-refresh-icon";
+      retryIcon.textContent = "\u21BB";
+      retryBtn.appendChild(retryIcon);
       retryBtn.title = "Retry";
       retryBtn.addEventListener("click", () => {
         retryBtn.disabled = true;

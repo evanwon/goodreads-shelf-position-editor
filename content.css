@@ -31,7 +31,8 @@
 }
 
 .gr-book-pos-input {
-  width: 56px;
+  flex: 1;
+  min-width: 40px;
   padding: 4px 6px;
   border: 1px solid #D8D8D2;
   border-radius: 3px;
@@ -69,8 +70,10 @@
 }
 
 .gr-book-pos-save {
-  min-width: 80px;
   padding: 4px 12px;
+  flex-shrink: 0;
+  text-overflow: clip;
+  overflow: hidden;
   background-color: #409D69;
   color: #fff;
   border: none;
@@ -106,6 +109,7 @@
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .gr-book-pos-refresh:hover:not(:disabled) {
@@ -127,7 +131,11 @@
   to { transform: rotate(360deg); }
 }
 
-.gr-book-pos-refresh.gr-book-pos-spinning {
+.gr-book-pos-refresh .gr-book-pos-refresh-icon {
+  display: inline-block;
+}
+
+.gr-book-pos-refresh.gr-book-pos-spinning .gr-book-pos-refresh-icon {
   animation: gr-spin 0.8s linear infinite;
 }
 
