@@ -26,6 +26,17 @@
     return /^\d+$/.test(String(value)) && parseInt(value, 10) >= 1;
   }
 
+  /** Formats a timestamp as a relative time string (e.g. "2h ago"). */
+  function formatRelativeTime(timestampMs) {
+    const diffSec = Math.floor((Date.now() - timestampMs) / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return diffMin + "m ago";
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return diffHr + "h ago";
+    return Math.floor(diffHr / 24) + "d ago";
+  }
+
   // Guard against double injection (SPA navigation can re-trigger content scripts)
   if (document.getElementById("gr-book-pos-widget")) return;
 
@@ -260,7 +271,8 @@
 
     if (cache.has(reviewId)) {
       LOG("Phase 2 — cache hit for review", reviewId);
-      return { ...cache.get(reviewId) };
+      const ts = localStorage.getItem(cacheKey(userId) + "-ts");
+      return { ...cache.get(reviewId), fromCache: true, cacheTimestamp: ts ? Number(ts) : null };
     }
 
     LOG("Phase 2 — paginating shelf for review", reviewId);
@@ -299,7 +311,7 @@
       if (rowCount === 0) break;
 
       if (cache.has(reviewId) && !result) {
-        result = { ...cache.get(reviewId) };
+        result = { ...cache.get(reviewId), fromCache: false };
         LOG("Found on page", page);
         // Keep paginating to fill cache, but stop after this page
         saveCache(userId, cache);
@@ -397,7 +409,7 @@
     if (status) status.textContent = text;
   }
 
-  function transitionToLoaded(widget, shelfId, position, userId, authToken, reviewId) {
+  function transitionToLoaded(widget, shelfId, position, userId, authToken, reviewId, fromCache, cacheTimestamp) {
     clearChildren(widget);
 
     const label = document.createElement("span");
@@ -442,47 +454,68 @@
       savePosition(input, saveBtn, userId, authToken);
     });
 
-    const refreshBtn = document.createElement("button");
-    refreshBtn.className = "gr-book-pos-refresh";
-    const refreshIcon = document.createElement("span");
-    refreshIcon.className = "gr-book-pos-refresh-icon";
-    refreshIcon.textContent = "\u21BB";
-    refreshBtn.appendChild(refreshIcon);
-    refreshBtn.title = "Refresh position from shelf";
-
-    refreshBtn.addEventListener("click", async () => {
-      refreshBtn.disabled = true;
-      refreshBtn.classList.add("gr-book-pos-spinning");
-
-      localStorage.removeItem(cacheKey(userId));
-      localStorage.removeItem(cacheKey(userId) + "-ts");
-      LOG("Cache cleared — refreshing position");
-
-      try {
-        const result = await findShelfData(userId, reviewId);
-        if (result) {
-          input.value = result.position;
-          input.dataset.originalValue = result.position;
-          input.dataset.shelfId = result.shelfId;
-          input.classList.remove("gr-book-pos-changed", "gr-book-pos-error");
-          saveBtn.disabled = true;
-          LOG("Refreshed position:", result.position);
-        } else {
-          LOG("Refresh: book not found in shelf data");
-        }
-      } catch (err) {
-        LOG("Refresh failed:", err);
-      } finally {
-        refreshBtn.disabled = false;
-        refreshBtn.classList.remove("gr-book-pos-spinning");
-      }
-    });
-
     widget.appendChild(createNameElement());
     widget.appendChild(label);
     widget.appendChild(input);
     widget.appendChild(saveBtn);
-    widget.appendChild(refreshBtn);
+
+    // Cache indicator — only shown when data came from cache
+    if (fromCache && cacheTimestamp) {
+      const cacheInfo = document.createElement("span");
+      cacheInfo.className = "gr-book-pos-cache-info";
+
+      const ageText = document.createElement("span");
+      ageText.textContent = "Cached " + formatRelativeTime(cacheTimestamp);
+
+      const refreshLink = document.createElement("a");
+      refreshLink.className = "gr-book-pos-refresh-link";
+      refreshLink.textContent = "Refresh";
+      refreshLink.href = "#";
+
+      const spinner = document.createElement("span");
+      spinner.className = "gr-book-pos-refresh-spinner";
+      spinner.style.display = "none";
+
+      refreshLink.addEventListener("click", async (e) => {
+        e.preventDefault();
+        if (refreshLink.dataset.loading === "true") return;
+        refreshLink.dataset.loading = "true";
+        refreshLink.style.display = "none";
+        spinner.style.display = "inline-block";
+
+        localStorage.removeItem(cacheKey(userId));
+        localStorage.removeItem(cacheKey(userId) + "-ts");
+        LOG("Cache cleared — refreshing position");
+
+        try {
+          const result = await findShelfData(userId, reviewId);
+          if (result) {
+            input.value = result.position;
+            input.dataset.originalValue = result.position;
+            input.dataset.shelfId = result.shelfId;
+            input.classList.remove("gr-book-pos-changed", "gr-book-pos-error");
+            saveBtn.disabled = true;
+            LOG("Refreshed position:", result.position);
+          } else {
+            LOG("Refresh: book not found in shelf data");
+          }
+          // Data is now fresh — hide the entire indicator
+          cacheInfo.style.display = "none";
+        } catch (err) {
+          LOG("Refresh failed:", err);
+          refreshLink.style.display = "";
+        } finally {
+          spinner.style.display = "none";
+          refreshLink.dataset.loading = "false";
+        }
+      });
+
+      cacheInfo.appendChild(ageText);
+      cacheInfo.appendChild(document.createTextNode(" \u00B7 "));
+      cacheInfo.appendChild(refreshLink);
+      cacheInfo.appendChild(spinner);
+      widget.appendChild(cacheInfo);
+    }
 
     LOG("Widget loaded, current position:", position);
   }
@@ -518,9 +551,9 @@
 
     if (onRetry) {
       const retryBtn = document.createElement("button");
-      retryBtn.className = "gr-book-pos-refresh";
+      retryBtn.className = "gr-book-pos-retry";
       const retryIcon = document.createElement("span");
-      retryIcon.className = "gr-book-pos-refresh-icon";
+      retryIcon.className = "gr-book-pos-retry-icon";
       retryIcon.textContent = "\u21BB";
       retryBtn.appendChild(retryIcon);
       retryBtn.title = "Retry";
@@ -607,7 +640,7 @@
         });
 
         if (result) {
-          transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId);
+          transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId, false, null);
         } else {
           transitionToError(widget, "On your To Read shelf, but position data could not be loaded.", () => {
             localStorage.removeItem(cacheKey(userId));
@@ -793,7 +826,7 @@
       }
 
       LOG("Found \u2014 shelfId:", result.shelfId, "position:", result.position);
-      transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId);
+      transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId, result.fromCache, result.cacheTimestamp);
     } catch (err) {
       LOG("Error:", err);
       transitionToError(widget, "Something went wrong", () => window.location.reload());
