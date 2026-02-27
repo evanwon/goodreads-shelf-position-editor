@@ -14,6 +14,18 @@
     }
   });
 
+  // --- Constants ---
+  const MAX_SHELF_PAGES = 50;
+  const ITEMS_PER_PAGE = 100;
+  const PAGINATION_DELAY_MS = 200;
+  const OBSERVER_DEBOUNCE_MS = 1000;
+  const SAVE_FLASH_MS = 2000;
+
+  /** Returns true if value is a positive integer (string or number). */
+  function isValidPosition(value) {
+    return /^\d+$/.test(String(value)) && parseInt(value, 10) >= 1;
+  }
+
   // Guard against double injection (SPA navigation can re-trigger content scripts)
   if (document.getElementById("gr-book-pos-widget")) return;
 
@@ -217,7 +229,9 @@
       if (!posInput) return;
       const nameMatch = posInput.name.match(/^positions\[(\d+)\]$/);
       if (!nameMatch) return;
-      cache.set(revId, { shelfId: nameMatch[1], position: posInput.value || "" });
+      const posValue = posInput.value || "";
+      if (posValue !== "" && !isValidPosition(posValue)) return;
+      cache.set(revId, { shelfId: nameMatch[1], position: posValue });
     });
     return rows.length;
   }
@@ -237,14 +251,14 @@
     // Paginate the shelf sorted by date_added (newest first) — recently added
     // books appear on page 1, and position inputs are present in non-search views.
     // Cache ALL rows seen so future book pages are instant.
-    const maxPages = 50;
+    const maxPages = MAX_SHELF_PAGES;
     let result = null;
 
     for (let page = 1; page <= maxPages; page++) {
       if (onProgress) onProgress(page);
       const url =
         `https://www.goodreads.com/review/list/${userId}?shelf=to-read` +
-        `&sort=date_added&order=d&per_page=100&page=${page}&view=table`;
+        `&sort=date_added&order=d&per_page=${ITEMS_PER_PAGE}&page=${page}&view=table`;
 
       const resp = await fetch(url, { credentials: "same-origin" });
       if (!resp.ok) throw new Error(`Shelf page ${page} HTTP ${resp.status}`);
@@ -267,7 +281,7 @@
 
       // Small delay between pages to be polite
       if (page < maxPages) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await new Promise((resolve) => setTimeout(resolve, PAGINATION_DELAY_MS));
       }
     }
 
@@ -582,7 +596,7 @@
         return;
       }
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(recheck, 1000);
+      debounceTimer = setTimeout(recheck, OBSERVER_DEBOUNCE_MS);
     });
 
     observer.observe(anchor, { childList: true, subtree: true });
@@ -638,7 +652,7 @@
       // Update with server-confirmed position if available
       if (data && data.shelves) {
         const shelf = data.shelves.find((s) => String(s.id) === shelfId);
-        if (shelf) {
+        if (shelf && isValidPosition(shelf.position)) {
           input.value = String(shelf.position);
           input.dataset.originalValue = String(shelf.position);
         } else {
@@ -657,7 +671,7 @@
       input.classList.add("gr-book-pos-saved");
       LOG("Position saved:", input.value);
 
-      setTimeout(() => input.classList.remove("gr-book-pos-saved"), 2000);
+      setTimeout(() => input.classList.remove("gr-book-pos-saved"), SAVE_FLASH_MS);
     } catch (err) {
       LOG("Save failed:", err);
       input.classList.add("gr-book-pos-error");

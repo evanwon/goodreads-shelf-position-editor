@@ -10,13 +10,13 @@ Prioritized by impact. See the full review in `.claude/plans/reflective-scribbli
   `*://www.goodreads.com/`, `*://www.goodreads.com/review/list/*`,
   `*://www.goodreads.com/shelf/move_batch/*`
 
-- [ ] **Validate position value from server** (`content.js:298`)
+- [x] **Validate position value from server** (`content.js:298`)
   Before setting `input.value = position`, verify the value is a positive integer.
   A malformed Goodreads response could show garbage in the widget.
 
 ## P3 — Code Quality / Maintainability
 
-- [ ] **Extract magic numbers to named constants** (`content.js`)
+- [x] **Extract magic numbers to named constants** (`content.js`)
   Move `maxPages = 50`, `per_page=100`, `200ms` delay, `2000ms` flash to named constants
   at the top of the IIFE (e.g. `MAX_SHELF_PAGES`, `ITEMS_PER_PAGE`, etc.)
 
