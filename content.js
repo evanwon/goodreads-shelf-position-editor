@@ -253,9 +253,10 @@
     // Cache ALL rows seen so future book pages are instant.
     const maxPages = MAX_SHELF_PAGES;
     let result = null;
+    let totalPages = null;
 
     for (let page = 1; page <= maxPages; page++) {
-      if (onProgress) onProgress(page);
+      if (onProgress) onProgress(page, totalPages);
       const url =
         `https://www.goodreads.com/review/list/${userId}?shelf=to-read` +
         `&sort=date_added&order=d&per_page=${ITEMS_PER_PAGE}&page=${page}&view=table`;
@@ -265,6 +266,17 @@
 
       const html = await resp.text();
       const doc = new DOMParser().parseFromString(html, "text/html");
+
+      // Parse total book count from page 1 to enable percentage progress
+      if (page === 1 && !totalPages) {
+        const titleEl = doc.querySelector("title");
+        const countMatch = titleEl?.textContent?.match(/\(([\d,]+)\s+books?\)/);
+        if (countMatch) {
+          const totalBooks = parseInt(countMatch[1].replace(/,/g, ""), 10);
+          totalPages = Math.ceil(totalBooks / ITEMS_PER_PAGE);
+          LOG("Total books:", totalBooks, "— estimated pages:", totalPages);
+        }
+      }
 
       const rowCount = parsePageRows(doc, cache);
       if (rowCount === 0) break;
@@ -562,8 +574,13 @@
 
         // Phase 2: get shelf ID + position
         updateWidgetStatus(widget, "Loading position\u2026");
-        const result = await findShelfData(userId, reviewId, (page) => {
-          updateWidgetStatus(widget, "Loading position\u2026 page " + page);
+        const result = await findShelfData(userId, reviewId, (page, totalPages) => {
+          if (totalPages) {
+            const pct = Math.round((page / totalPages) * 100);
+            updateWidgetStatus(widget, "Loading position\u2026 " + pct + "%");
+          } else {
+            updateWidgetStatus(widget, "Loading position\u2026");
+          }
         });
 
         if (result) {
@@ -732,8 +749,13 @@
 
       // Phase 2: Paginate non-search shelf view to get shelf ID + position
       updateWidgetStatus(widget, "Loading position\u2026");
-      const result = await findShelfData(userId, reviewId, (page) => {
-        updateWidgetStatus(widget, "Loading position\u2026 page " + page);
+      const result = await findShelfData(userId, reviewId, (page, totalPages) => {
+        if (totalPages) {
+          const pct = Math.round((page / totalPages) * 100);
+          updateWidgetStatus(widget, "Loading position\u2026 " + pct + "%");
+        } else {
+          updateWidgetStatus(widget, "Loading position\u2026");
+        }
       });
 
       if (!result) {
