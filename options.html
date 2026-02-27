@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <style>
+    :root {
+      color-scheme: light dark;
+    }
     body {
       font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-size: 14px;
@@ -55,6 +58,20 @@
       margin-left: 8px;
       font-size: 13px;
       color: #409D69;
+    }
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #2b2a33;
+        color: #fbfbfe;
+      }
+      input[type="number"] {
+        background-color: #42414d;
+        color: #fbfbfe;
+        border-color: #5b5b66;
+      }
+      .hint {
+        color: #b1b1b8;
+      }
     }
   </style>
 </head>
