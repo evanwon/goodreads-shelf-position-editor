@@ -12,6 +12,9 @@ npm-debug.log*
 coverage/
 .nyc_output/
 
+# Visual test screenshots
+test/screenshots/
+
 # Editor files
 .vscode/*
 !.vscode/extensions.json

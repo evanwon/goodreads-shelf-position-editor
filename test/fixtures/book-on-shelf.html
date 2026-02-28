@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta property="og:title" content="The Great Gatsby">
+  <meta name="csrf-token" content="test-csrf-token-abc123">
+  <title>The Great Gatsby by F. Scott Fitzgerald | Goodreads</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif; background: #F4F1EA; color: #382110; font-size: 14px; line-height: 1.4; }
+
+    /* --- Header --- */
+    .Header { background: #F4F1EA; border-bottom: 1px solid #D8D8D2; padding: 8px 0; }
+    .Header__inner { max-width: 970px; margin: 0 auto; display: flex; align-items: center; gap: 24px; padding: 0 16px; }
+    .Header__logo { font-family: "Lora", Georgia, serif; font-size: 22px; font-weight: 700; color: #382110; text-decoration: none; letter-spacing: -0.5px; }
+    .Header__nav { display: flex; gap: 16px; }
+    .Header__nav a { color: #382110; text-decoration: none; font-size: 13px; font-weight: 700; }
+    .Header__nav a:hover { color: #00635D; }
+    .Header__search { flex: 1; max-width: 340px; }
+    .Header__search input { width: 100%; padding: 6px 10px; border: 1px solid #D8D8D2; border-radius: 3px; font-size: 13px; background: #fff; }
+    .Header__right { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+    .Header__right a { color: #00635D; text-decoration: none; font-size: 13px; font-weight: 700; }
+
+    /* --- Page layout --- */
+    .BookPage { max-width: 970px; margin: 0 auto; padding: 20px 16px; display: flex; gap: 24px; }
+    .BookPage__left { width: 220px; flex-shrink: 0; }
+    .BookPage__right { flex: 1; min-width: 0; }
+
+    /* --- Cover --- */
+    .BookCover { width: 220px; border-radius: 4px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .BookCover__placeholder { width: 220px; height: 330px; background: linear-gradient(145deg, #2A5B4F 0%, #1A3C34 50%, #0D1F1A 100%); display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 24px; }
+    .BookCover__title { color: #C9A96E; font-family: "Lora", Georgia, serif; font-size: 22px; font-weight: 700; text-align: center; line-height: 1.3; margin-bottom: 8px; }
+    .BookCover__author { color: #8BB0A4; font-size: 13px; text-align: center; }
+    .BookCover__deco { width: 60px; height: 2px; background: #C9A96E; margin: 16px auto 0; opacity: 0.5; }
+
+    /* --- Actions (left column, below cover) --- */
+    .BookActions { margin-top: 12px; }
+    .BookActions__wtr { width: 100%; padding: 12px 0; background: #409D69; color: #fff; border: none; border-radius: 3px; font-size: 16px; font-weight: 700; font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .BookActions__wtr:hover { background: #357a54; }
+    .BookActions__wtr svg { fill: #fff; }
+    .BookActions__rate { margin-top: 8px; display: flex; justify-content: center; gap: 4px; }
+    .BookActions__star { color: #D8D8D2; font-size: 22px; cursor: pointer; }
+    .BookActions__star:hover, .BookActions__star.active { color: #E87400; }
+    .BookActions__rateLabel { text-align: center; color: #999; font-size: 12px; margin-top: 4px; }
+
+    /* --- Title / Author --- */
+    .BookTitle { font-family: "Lora", Georgia, serif; font-size: 28px; font-weight: 700; color: #382110; line-height: 1.25; margin-bottom: 4px; }
+    .BookAuthor { font-size: 16px; margin-bottom: 12px; }
+    .BookAuthor a { color: #00635D; text-decoration: none; font-weight: 700; }
+    .BookAuthor a:hover { text-decoration: underline; }
+
+    /* --- Rating --- */
+    .BookRating { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #E8E8E0; }
+    .BookRating__stars { display: flex; gap: 2px; color: #E87400; font-size: 18px; }
+    .BookRating__score { font-size: 16px; font-weight: 700; color: #382110; }
+    .BookRating__meta { font-size: 13px; color: #999; }
+    .BookRating__meta a { color: #999; text-decoration: none; }
+    .BookRating__meta a:hover { text-decoration: underline; }
+
+    /* --- Description --- */
+    .BookDescription { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #E8E8E0; }
+    .BookDescription p { font-size: 15px; line-height: 1.6; color: #333; margin-bottom: 12px; }
+
+    /* --- Genres --- */
+    .BookGenres { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #E8E8E0; }
+    .BookGenres__label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #999; margin-bottom: 8px; }
+    .BookGenres__list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .BookGenres__tag { display: inline-block; padding: 4px 12px; background: #F4F1EA; border: 1px solid #D8D8D2; border-radius: 16px; font-size: 13px; color: #382110; text-decoration: none; }
+    .BookGenres__tag:hover { background: #E8E8E0; }
+
+    /* --- Details --- */
+    .BookDetails { font-size: 13px; color: #666; line-height: 1.8; }
+    .BookDetails p { margin-bottom: 2px; }
+    .BookDetails__label { color: #999; }
+  </style>
+</head>
+<body>
+  <!-- Content script reads script text via regex — type="text/plain" prevents execution -->
+  <script type="text/plain">
+    CurrentUserStore.initializeWith({"profileUrl":"/user/show/12345678","name":"Test User"});
+  </script>
+
+  <!-- Header -->
+  <div class="Header">
+    <div class="Header__inner">
+      <a class="Header__logo" href="/">goodreads</a>
+      <nav class="Header__nav">
+        <a href="#">Home</a>
+        <a href="#">My Books</a>
+        <a href="#">Browse</a>
+        <a href="#">Community</a>
+      </nav>
+      <div class="Header__search">
+        <input type="text" placeholder="Search books">
+      </div>
+      <div class="Header__right">
+        <a href="#">Test User</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Book page -->
+  <div class="BookPage">
+    <div class="BookPage__left">
+      <div class="BookCover">
+        <div class="BookCover__placeholder">
+          <div class="BookCover__title">The Great Gatsby</div>
+          <div class="BookCover__author">F. Scott Fitzgerald</div>
+          <div class="BookCover__deco"></div>
+        </div>
+      </div>
+      <div class="BookActions">
+        <button class="BookActions__wtr">
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 1l2.2 4.4L15 6.1l-3.5 3.4.8 4.9L8 12.3 3.7 14.4l.8-4.9L1 6.1l4.8-.7z"/></svg>
+          Want to Read
+        </button>
+        <div class="BookActions__rate">
+          <span class="BookActions__star">&#9733;</span>
+          <span class="BookActions__star">&#9733;</span>
+          <span class="BookActions__star">&#9733;</span>
+          <span class="BookActions__star">&#9733;</span>
+          <span class="BookActions__star">&#9733;</span>
+        </div>
+        <div class="BookActions__rateLabel">Rate this book</div>
+      </div>
+    </div>
+
+    <div class="BookPage__right">
+      <h1 class="BookTitle">The Great Gatsby</h1>
+      <div class="BookAuthor">by <a href="#">F. Scott Fitzgerald</a></div>
+
+      <div class="BookRating">
+        <div class="BookRating__stars">&#9733;&#9733;&#9733;&#9733;&#9734;</div>
+        <span class="BookRating__score">3.93</span>
+        <span class="BookRating__meta">
+          <a href="#">5,959,065 ratings</a> &middot; <a href="#">97,342 reviews</a>
+        </span>
+      </div>
+
+      <div class="BookDescription">
+        <p>The Great Gatsby, F. Scott Fitzgerald's third book, stands as the supreme achievement of his career. This exemplary novel of the Jazz Age has been acclaimed by generations of readers.</p>
+        <p>The story of the fabulously wealthy Jay Gatsby and his love for the beautiful Daisy Buchanan, of lavish parties on Long Island at a time when The New York Times noted "ichever combats the forces of lawlessness," is an exquisitely crafted tale of America in the 1920s.</p>
+      </div>
+
+      <div class="BookGenres">
+        <div class="BookGenres__label">Genres</div>
+        <div class="BookGenres__list">
+          <a class="BookGenres__tag" href="#">Classics</a>
+          <a class="BookGenres__tag" href="#">Fiction</a>
+          <a class="BookGenres__tag" href="#">Historical Fiction</a>
+          <a class="BookGenres__tag" href="#">Literature</a>
+          <a class="BookGenres__tag" href="#">School</a>
+          <a class="BookGenres__tag" href="#">Novels</a>
+          <a class="BookGenres__tag" href="#">American</a>
+        </div>
+      </div>
+
+      <div class="BookDetails">
+        <p>180 pages, Paperback</p>
+        <p>First published April 10, 1925</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
