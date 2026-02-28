@@ -1,6 +1,6 @@
 # GR Shelf Position Editor
 
-Firefox WebExtension that shows and edits your To Read shelf position directly on Goodreads book detail pages (`/book/show/*`).
+Firefox WebExtension that shows and edits your To Read shelf position directly on Goodreads book detail pages (`/book/show/*`). Chrome support is planned soon — keep cross-browser compatibility in mind when making changes (use MV3, avoid Firefox-only APIs without Chrome equivalents).
 
 ## Project Structure
 
@@ -32,7 +32,7 @@ content.js runs on every `/book/show/*` page and executes these steps:
 
 ## Key Technical Details
 
-- **Manifest V2** (Firefox preferred for temporary add-ons via `about:debugging`)
+- **Manifest V3** (cross-browser; Chrome support planned). `version_name` in manifest is Chrome-specific (Firefox warns but ignores it) — keep it for future Chrome publishing
 - Content scripts use **absolute URLs** for fetch — relative URLs resolve against the extension origin
 - CSRF token from `<meta name="csrf-token">` (homepage fetch, since book pages lack it)
 - **Shelf IDs** (used in the save API) differ from **review IDs** (used in DOM row IDs) — the two-phase lookup maps between them
