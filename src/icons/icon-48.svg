@@ -1,5 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Background -->
   <rect width="48" height="48" rx="8" fill="#382110"/>
-  <text x="24" y="20" text-anchor="middle" font-family="Georgia, serif" font-size="14" font-weight="bold" fill="#F4F1EA">#</text>
-  <text x="24" y="38" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#00635D">123</text>
+
+  <!-- Book spines (three horizontal bars) -->
+  <!-- Top spine - cream -->
+  <rect x="6" y="10" width="26" height="6" rx="1.5" fill="#F4F1EA"/>
+  <!-- Middle spine - teal (selected/active) -->
+  <rect x="6" y="21" width="26" height="6" rx="1.5" fill="#00635D"/>
+  <!-- Bottom spine - cream -->
+  <rect x="6" y="32" width="26" height="6" rx="1.5" fill="#F4F1EA"/>
+
+  <!-- Up chevron -->
+  <path d="M38 18 L41 14 L44 18" fill="none" stroke="#F4F1EA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Down chevron -->
+  <path d="M38 30 L41 34 L44 30" fill="none" stroke="#F4F1EA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
