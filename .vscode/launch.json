@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug GR Shelf Position Editor (Auto-Reload)",
+      "name": "Debug Goodreads Shelf Position Editor (Auto-Reload)",
       "type": "firefox",
       "request": "launch",
       "reAttach": true,
@@ -20,7 +20,7 @@
       }
     },
     {
-      "name": "Debug GR Shelf Position Editor",
+      "name": "Debug Goodreads Shelf Position Editor",
       "type": "firefox",
       "request": "launch",
       "reAttach": true,

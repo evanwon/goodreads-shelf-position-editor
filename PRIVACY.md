@@ -1,6 +1,6 @@
 # Privacy Policy
 
-GR Shelf Position Editor is a browser extension that displays and edits your To Read shelf position on Goodreads book pages.
+Goodreads Shelf Position Editor is a browser extension that displays and edits your To Read shelf position on Goodreads book pages.
 
 ## Data Collected
 

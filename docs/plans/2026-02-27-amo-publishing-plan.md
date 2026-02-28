@@ -1,8 +1,8 @@
-# GR Shelf Position Editor — AMO Publishing & CI/CD Plan
+# Goodreads Shelf Position Editor — AMO Publishing & CI/CD Plan
 
 ## Context
 
-The GR Shelf Position Editor is a Firefox content-script-only extension (835 lines, no background page, no dependencies) that's functionally complete but has zero build tooling, tests, or CI/CD. The goal is to:
+The Goodreads Shelf Position Editor is a Firefox content-script-only extension (835 lines, no background page, no dependencies) that's functionally complete but has zero build tooling, tests, or CI/CD. The goal is to:
 
 1. Publish to the Firefox Add-ons Marketplace (AMO)
 2. Automate the build/deploy pipeline, replicating the robust patterns from [fancy-links](https://github.com/evanwon/fancy-links/)
@@ -311,7 +311,7 @@ Steps (adapted from fancy-links build-release.yml):
 |---|---|
 | `fancy-links` in artifact names | `gr-shelf-position-editor` |
 | `manifest_version !== 2` | `manifest_version !== 3` |
-| `Fancy Links v$VERSION` | `GR Shelf Position Editor v$VERSION` |
+| `Fancy Links v$VERSION` | `Goodreads Shelf Position Editor v$VERSION` |
 | Permissions: clipboardWrite, activeTab, storage, notifications | Permissions: storage + host permissions for goodreads.com |
 | Firefox 109+ | Firefox 109+ |
 
@@ -367,7 +367,7 @@ For a pre-release of version 2.1.0:
 4. Set GitHub variable: `AMO_SUBMISSION_ENABLED=true`
 
 ### AMO listing materials
-- **Name**: GR Shelf Position Editor
+- **Name**: Goodreads Shelf Position Editor
 - **Summary**: View and edit your To Read shelf position directly on Goodreads book pages
 - **Category**: Productivity / Tools
 - **Screenshots**: 2-3 showing the widget on Goodreads book pages (loading state, position display, save confirmation)

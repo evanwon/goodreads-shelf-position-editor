@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "GR Shelf Position Editor",
+  "name": "Goodreads Shelf Position Editor",
   "version": "1.0.0",
   "version_name": "1.0.0",
   "description": "View and edit your To Read shelf position directly on Goodreads book pages.",

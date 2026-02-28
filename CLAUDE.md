@@ -1,4 +1,4 @@
-# GR Shelf Position Editor
+# Goodreads Shelf Position Editor
 
 Firefox WebExtension that shows and edits your To Read shelf position directly on Goodreads book detail pages (`/book/show/*`). Chrome support is planned soon — keep cross-browser compatibility in mind when making changes (use MV3, avoid Firefox-only APIs without Chrome equivalents).
 
