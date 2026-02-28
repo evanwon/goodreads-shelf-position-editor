@@ -119,8 +119,7 @@ gr-shelf-position-editor/
    ]
    ```
 5. Remove `"browser_style": true` from `options_ui` (deprecated in MV3; options.html already has full inline styles)
-6. Keep `browser_specific_settings.gecko` with existing `data_collection_permissions`
-7. Keep `strict_min_version: "109.0"` (Firefox 109 = first MV3 support)
+6. Keep `browser_specific_settings.gecko` with extension ID and `strict_min_version: "109.0"` (Firefox 109 = first MV3 support)
 
 ### No code changes needed
 - Content scripts work identically in MV3
@@ -133,7 +132,7 @@ gr-shelf-position-editor/
 
 ---
 
-## Phase 3: Icon Generation — [ ]
+## Phase 3: Icon Generation — [x] Done
 
 **Goal**: Create multi-size PNG icons for AMO listing (requires 48px+, recommends 96px for high-DPI).
 
