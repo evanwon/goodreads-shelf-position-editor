@@ -13,7 +13,7 @@ This is a multi-session effort. Each phase below is independently committable.
 
 ---
 
-## Phase 1: Project Restructuring
+## Phase 1: Project Restructuring — [x] Done
 
 **Goal**: Move source files into `src/`, establish package.json and dev tooling.
 
@@ -100,7 +100,7 @@ gr-shelf-position-editor/
 
 ---
 
-## Phase 2: Manifest V3 Migration
+## Phase 2: Manifest V3 Migration — [x] Done
 
 **Goal**: Upgrade from MV2 to MV3. This is a lightweight migration for content-script-only extensions.
 
@@ -133,7 +133,7 @@ gr-shelf-position-editor/
 
 ---
 
-## Phase 3: Icon Generation
+## Phase 3: Icon Generation — [ ]
 
 **Goal**: Create multi-size PNG icons for AMO listing (requires 48px+, recommends 96px for high-DPI).
 
@@ -165,7 +165,7 @@ Use a `tools/generate-icons.js` script (one-off, not a build dependency). Could 
 
 ---
 
-## Phase 4: Extract Utility Modules for Testability
+## Phase 4: Extract Utility Modules for Testability — [ ]
 
 **Goal**: Extract pure functions from the 835-line content.js IIFE into separate files that Jest can import, using the same multi-file content script pattern fancy-links uses.
 
@@ -221,7 +221,7 @@ Constants: `DEFAULT_TTL_HOURS`, `USER_ID_CACHE_KEY`
 
 ---
 
-## Phase 5: Testing Setup
+## Phase 5: Testing Setup — [ ]
 
 **Goal**: Add Jest test suite with the same infrastructure as fancy-links.
 
@@ -265,7 +265,7 @@ module.exports = {
 
 ---
 
-## Phase 6: CI/CD Pipeline
+## Phase 6: CI/CD Pipeline — [ ]
 
 **Goal**: GitHub Actions workflows replicating fancy-links, adapted for this project.
 
@@ -322,7 +322,7 @@ For a pre-release of version 2.1.0:
 
 ---
 
-## Phase 7: Documentation Updates
+## Phase 7: Documentation Updates — [ ]
 
 **Goal**: Update all docs to reflect new structure and workflows.
 
@@ -346,7 +346,7 @@ For a pre-release of version 2.1.0:
 
 ---
 
-## Phase 8: First AMO Submission
+## Phase 8: First AMO Submission — [ ]
 
 **Goal**: Submit to addons.mozilla.org for the first time.
 

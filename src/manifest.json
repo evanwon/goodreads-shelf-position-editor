@@ -1,7 +1,8 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "GR Shelf Position Editor",
-  "version": "1.0",
+  "version": "2.0.0",
+  "version_name": "2.0.0",
   "description": "View and edit your To Read shelf position directly on Goodreads book pages.",
   "author": "Evan Wondrasek",
   "homepage_url": "https://github.com/evanwon/gr-shelf-position-editor",
@@ -17,14 +18,15 @@
     }
   ],
   "permissions": [
-    "storage",
+    "storage"
+  ],
+  "host_permissions": [
     "*://www.goodreads.com/",
     "*://www.goodreads.com/review/list/*",
     "*://www.goodreads.com/shelf/move_batch/*"
   ],
   "options_ui": {
-    "page": "options.html",
-    "browser_style": true
+    "page": "options.html"
   },
   "browser_specific_settings": {
     "gecko": {
