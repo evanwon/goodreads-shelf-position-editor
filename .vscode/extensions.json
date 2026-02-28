@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "firefox-devtools.vscode-firefox-debug",
+    "github.vscode-pull-request-github",
+    "orta.vscode-jest",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}

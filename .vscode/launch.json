@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug GR Shelf Position Editor (Auto-Reload)",
+      "type": "firefox",
+      "request": "launch",
+      "reAttach": true,
+      "addonPath": "${workspaceFolder}/src",
+      "reloadOnChange": {
+        "watch": [
+          "${workspaceFolder}/src/**/*.js",
+          "${workspaceFolder}/src/**/*.json",
+          "${workspaceFolder}/src/**/*.html",
+          "${workspaceFolder}/src/**/*.css"
+        ],
+        "ignore": [
+          "${workspaceFolder}/src/**/*.git/**"
+        ]
+      }
+    },
+    {
+      "name": "Debug GR Shelf Position Editor",
+      "type": "firefox",
+      "request": "launch",
+      "reAttach": true,
+      "addonPath": "${workspaceFolder}/src"
+    }
+  ]
+}

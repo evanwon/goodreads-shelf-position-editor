@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["es2020", "dom"],
+    "allowJs": true,
+    "checkJs": false,
+    "moduleResolution": "node",
+    "skipLibCheck": true
+  },
+  "typeAcquisition": {
+    "include": ["firefox-webext-browser"]
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test"
+  ]
+}

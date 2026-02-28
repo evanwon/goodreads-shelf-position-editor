@@ -1,0 +1,26 @@
+# Set default behavior for all files
+* text=auto
+
+# Ensure specific file types are handled correctly
+*.js text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text eol=lf
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+
+# Extension specific
+*.xpi binary
+manifest.json text eol=lf
