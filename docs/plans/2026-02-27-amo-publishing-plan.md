@@ -11,6 +11,17 @@ The GR Shelf Position Editor is a Firefox content-script-only extension (835 lin
 
 This is a multi-session effort. Each phase below is independently committable.
 
+## Progress
+
+- [x] **Phase 1**: Project Restructuring — src/ layout, package.json, dev tooling
+- [x] **Phase 2**: Manifest V3 Migration
+- [x] **Phase 3**: Icon Generation (16/32/48/96/128px PNGs)
+- [x] **Phase 4**: Extract Utility Modules (parse.js, cache.js)
+- [x] **Phase 5**: Testing Setup (Jest + test suites)
+- [ ] **Phase 6**: CI/CD Pipeline (GitHub Actions)
+- [ ] **Phase 7**: Documentation Updates
+- [ ] **Phase 8**: First AMO Submission
+
 ---
 
 ## Phase 1: Project Restructuring — [x] Done
@@ -220,7 +231,7 @@ Constants: `DEFAULT_TTL_HOURS`, `USER_ID_CACHE_KEY`
 
 ---
 
-## Phase 5: Testing Setup — [ ]
+## Phase 5: Testing Setup — [x] Done
 
 **Goal**: Add Jest test suite with the same infrastructure as fancy-links.
 
