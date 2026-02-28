@@ -4,7 +4,6 @@
   const LOG = (...args) => console.log("[GR Shelf Position]", ...args);
 
   // --- Cache TTL (configurable via extension options) ---
-  const DEFAULT_TTL_HOURS = 168;
   let cacheTtlMs = DEFAULT_TTL_HOURS * 60 * 60 * 1000;
 
   browser.storage.local.get("cacheTtlHours").then((result) => {
@@ -21,80 +20,19 @@
   const OBSERVER_DEBOUNCE_MS = 1000;
   const SAVE_FLASH_MS = 2000;
 
-  /** Returns true if value is a positive integer (string or number). */
-  function isValidPosition(value) {
-    return /^\d+$/.test(String(value)) && parseInt(value, 10) >= 1;
-  }
-
-  /** Formats a timestamp as a relative time string (e.g. "2h ago"). */
-  function formatRelativeTime(timestampMs) {
-    const diffSec = Math.floor((Date.now() - timestampMs) / 1000);
-    if (diffSec < 60) return "just now";
-    const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return diffMin + "m ago";
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return diffHr + "h ago";
-    return Math.floor(diffHr / 24) + "d ago";
-  }
-
   // Guard against double injection (SPA navigation can re-trigger content scripts)
   if (document.getElementById("gr-book-pos-widget")) return;
 
   // --- Step 1: Extract book ID from URL ---
 
-  const bookIdMatch = window.location.pathname.match(/\/book\/show\/(\d+)/);
-  if (!bookIdMatch) return;
-  const bookId = bookIdMatch[1];
+  const bookId = extractBookId(window.location.pathname);
+  if (!bookId) return;
   LOG("Book ID:", bookId);
 
-  // --- Step 2: Extract book title ---
-
-  function getBookTitle() {
-    let title = null;
-
-    // Primary: og:title meta tag (stable across layouts)
-    const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) {
-      const content = ogTitle.getAttribute("content");
-      if (content) title = content.trim();
-    }
-
-    // Fallback: page <title> — "Book Title by Author Name | Goodreads"
-    if (!title && document.title) {
-      const titleMatch = document.title.match(/^(.+?)\s+by\s+/);
-      if (titleMatch) title = titleMatch[1].trim();
-    }
-
-    if (!title) return null;
-
-    // Strip trailing ellipsis — og:title often truncates long titles
-    title = title.replace(/\u2026$/, "").replace(/\.\.\.$/, "").trim();
-
-    return title;
-  }
-
-  // --- Step 3: Discover user ID + CSRF token ---
+  // --- Step 2–3: Discover user ID + CSRF token ---
+  // getUserIdFromPage, getCsrfFromPage, getBookTitle → utils/parse.js
   // Modern Goodreads book pages don't include CurrentUserStore in inline scripts,
   // so we first check the current page, then fall back to fetching the homepage.
-
-  function getUserIdFromPage(doc) {
-    const scripts = doc.querySelectorAll("script");
-    for (const script of scripts) {
-      const text = script.textContent;
-      const match = text.match(
-        /CurrentUserStore\.initializeWith\(\s*\{[^}]*"profileUrl"\s*:\s*"\/user\/show\/(\d+)/
-      );
-      if (match) return match[1];
-    }
-    return null;
-  }
-
-  function getCsrfFromPage(doc) {
-    const meta = doc.querySelector('meta[name="csrf-token"]');
-    return meta ? meta.getAttribute("content") : null;
-  }
-
-  const USER_ID_CACHE_KEY = "gr-book-pos-userid";
 
   async function discoverUserIdAndCsrf() {
     // Try current page first
@@ -146,55 +84,13 @@
     return null;
   }
 
-  // --- Step 4: Cache layer (localStorage) ---
-  // Stores reviewId -> { shelfId, position } for all books seen during pagination.
-  // On subsequent visits to any book page, cache is checked first — skipping phase 2.
-  // Shared with goodreads-position-fixer if same user.
-
-  function cacheKey(userId) {
-    return `gr-pos-fixer-${userId}`;
-  }
-
-  function loadCache(userId) {
-    try {
-      const raw = localStorage.getItem(cacheKey(userId));
-      if (!raw) return new Map();
-
-      // Check TTL
-      const ts = localStorage.getItem(cacheKey(userId) + "-ts");
-      if (cacheTtlMs > 0 && (!ts || Date.now() - Number(ts) > cacheTtlMs)) {
-        LOG("Cache expired — clearing");
-        localStorage.removeItem(cacheKey(userId));
-        localStorage.removeItem(cacheKey(userId) + "-ts");
-        return new Map();
-      }
-
-      return new Map(Object.entries(JSON.parse(raw)));
-    } catch (e) {
-      LOG("Cache read failed:", e);
-      return new Map();
-    }
-  }
-
-  function saveCache(userId, cache) {
-    try {
-      localStorage.setItem(cacheKey(userId), JSON.stringify(Object.fromEntries(cache)));
-      localStorage.setItem(cacheKey(userId) + "-ts", String(Date.now()));
-    } catch (e) {
-      LOG("Cache write failed:", e);
-    }
-  }
+  // Cache functions (cacheKey, loadCache, saveCache, clearCache) → utils/cache.js
 
   // --- Step 5: Find book on To Read shelf ---
   // Two-phase approach:
   //   Phase 1: Title search to confirm book is on shelf + get review ID (fast, 1 request)
   //   Phase 2: Check cache, then paginate non-search shelf view to get shelf ID + position
   //            (search results don't include position inputs)
-
-  function cleanTitle(title) {
-    // Strip series info in parens, e.g. "The Hobbit (The Lord of the Rings, #0)"
-    return title.replace(/\s*\([^)]*#\d+[^)]*\)\s*$/, "").trim();
-  }
 
   async function findReviewId(userId, searchTitle) {
     const url =
@@ -266,7 +162,7 @@
 
   async function findShelfData(userId, reviewId, onProgress) {
     // Check cache first
-    const cache = loadCache(userId);
+    const cache = loadCache(userId, cacheTtlMs);
     LOG("Cache has", cache.size, "entries");
 
     if (cache.has(reviewId)) {
@@ -483,8 +379,7 @@
         refreshLink.style.display = "none";
         spinner.style.display = "inline-block";
 
-        localStorage.removeItem(cacheKey(userId));
-        localStorage.removeItem(cacheKey(userId) + "-ts");
+        clearCache(userId);
         LOG("Cache cleared — refreshing position");
 
         try {
@@ -603,8 +498,7 @@
       transitionToLoading(widget);
 
       // Clear cache — it won't have the newly added book
-      localStorage.removeItem(cacheKey(userId));
-      localStorage.removeItem(cacheKey(userId) + "-ts");
+      clearCache(userId);
 
       try {
         // Phase 1: confirm book is now on shelf
@@ -643,8 +537,7 @@
           transitionToLoaded(widget, result.shelfId, result.position, userId, authToken, reviewId, false, null);
         } else {
           transitionToError(widget, "On your To Read shelf, but position data could not be loaded.", () => {
-            localStorage.removeItem(cacheKey(userId));
-            localStorage.removeItem(cacheKey(userId) + "-ts");
+            clearCache(userId);
             window.location.reload();
           });
         }
@@ -737,8 +630,7 @@
       }
 
       // Clear cache — other books' positions shifted, so cache is stale
-      localStorage.removeItem(cacheKey(userId));
-      localStorage.removeItem(cacheKey(userId) + "-ts");
+      clearCache(userId);
 
       input.classList.remove("gr-book-pos-changed");
       input.classList.add("gr-book-pos-saved");
@@ -757,7 +649,7 @@
   // --- Run ---
 
   (async function run() {
-    const bookTitle = getBookTitle();
+    const bookTitle = getBookTitle(document);
     LOG("Book title:", bookTitle);
 
     if (!bookTitle) {
@@ -818,8 +710,7 @@
         LOG("Could not find shelf data for review", reviewId,
           "\u2014 book is on shelf but position data not found (shelf may exceed pagination limit)");
         transitionToError(widget, "On your To Read shelf, but position data could not be loaded.", () => {
-          localStorage.removeItem(cacheKey(userId));
-          localStorage.removeItem(cacheKey(userId) + "-ts");
+          clearCache(userId);
           window.location.reload();
         });
         return;
