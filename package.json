@@ -18,7 +18,8 @@
     "@types/firefox-webext-browser": "^120.0.4",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "jest-webextension-mock": "^3.9.0"
+    "jest-webextension-mock": "^3.9.0",
+    "jsdom": "^26.1.0"
   },
   "overrides": {
     "@babel/core": "7.28.0"
