@@ -399,7 +399,7 @@ jobs:
         This is a pre-release version for testing new features.
         - May contain bugs or incomplete features
         - Will auto-update to stable version when released
-        - Please report issues at https://github.com/evanwon/gr-shelf-position-editor/issues
+        - Please report issues at https://github.com/evanwon/goodreads-shelf-position-editor/issues
 
         EOF
         fi

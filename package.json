@@ -29,12 +29,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/evanwon/gr-shelf-position-editor.git"
+    "url": "git+https://github.com/evanwon/goodreads-shelf-position-editor.git"
   },
   "author": "Evan Wondrasek",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/evanwon/gr-shelf-position-editor/issues"
+    "url": "https://github.com/evanwon/goodreads-shelf-position-editor/issues"
   },
-  "homepage": "https://github.com/evanwon/gr-shelf-position-editor#readme"
+  "homepage": "https://github.com/evanwon/goodreads-shelf-position-editor#readme"
 }
