@@ -1,0 +1,473 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create GitHub release (only for manual builds)'
+        type: boolean
+        default: false
+      submit_to_amo:
+        description: 'Submit to AMO for public distribution'
+        type: boolean
+        default: false
+      channel:
+        description: 'AMO submission channel'
+        type: choice
+        options:
+          - listed
+          - unlisted
+        default: listed
+      version_notes:
+        description: 'Version notes for AMO submission'
+        type: string
+        required: false
+
+permissions:
+  contents: write  # Required for creating releases and uploading assets
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        browser: [firefox]  # Future: [firefox, chrome, edge]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 50  # Fetch enough history for changelog generation
+
+    - name: Fetch tags for changelog generation
+      run: git fetch --tags origin
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+
+    - name: Install dependencies
+      run: npm ci --ignore-scripts
+
+    - name: Security audit
+      run: |
+        npm audit --audit-level=moderate || {
+          echo "::warning::Security vulnerabilities found! Run 'npm audit' locally for details."
+          npm audit --audit-level=moderate --json > audit-results.json
+          exit 1
+        }
+
+    - name: Run tests with coverage
+      run: npm run test:ci
+
+    - name: Install build tools
+      run: |
+        npm install -g web-ext --ignore-scripts  # Firefox extension tool
+        # Future: npm install -g chrome-webstore-upload-cli --ignore-scripts
+
+    - name: Validate manifest
+      run: |
+        echo "Validating manifest.json for ${{ matrix.browser }}..."
+        node -e "
+          const manifest = JSON.parse(require('fs').readFileSync('src/manifest.json', 'utf8'));
+          console.log('Extension:', manifest.name, 'v' + manifest.version);
+          console.log('Target browser: ${{ matrix.browser }}');
+          if (!manifest.version) throw new Error('No version in manifest');
+          if ('${{ matrix.browser }}' === 'firefox' && manifest.manifest_version !== 3) {
+            throw new Error('Expected Manifest V3 for Firefox build');
+          }
+        "
+
+    - name: Extract version
+      id: get_version
+      run: |
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          # Extract from tag
+          echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        else
+          # Extract from manifest.json for manual builds
+          version=$(node -e "console.log(JSON.parse(require('fs').readFileSync('src/manifest.json', 'utf8')).version)")
+          echo "version=$version" >> $GITHUB_OUTPUT
+        fi
+
+        # Also extract version_name if present (for pre-release detection)
+        version_name=$(node -e "const m = JSON.parse(require('fs').readFileSync('src/manifest.json', 'utf8')); console.log(m.version_name || m.version)")
+        echo "version_name=$version_name" >> $GITHUB_OUTPUT
+
+    - name: Determine release type
+      id: release_type
+      run: |
+        # Check version_name for pre-release indicators
+        VERSION_NAME="${{ steps.get_version.outputs.version_name }}"
+        VERSION="${{ steps.get_version.outputs.version }}"
+
+        # Check if version_name contains pre-release suffix (rc, beta, alpha)
+        # Examples: 1.5.0-rc1, 1.5.0-beta2, 1.5.0-alpha3
+        if [[ "$VERSION_NAME" =~ -(rc|beta|pre|alpha)[0-9]*$ ]]; then
+          echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          echo "Pre-release detected: $VERSION_NAME"
+        else
+          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          echo "Stable release detected: $VERSION"
+        fi
+
+    - name: Firefox - Lint extension
+      if: matrix.browser == 'firefox'
+      run: |
+        echo "Firefox: Linting extension with web-ext..."
+        web-ext lint --source-dir=src --warnings-as-errors
+
+    - name: Firefox - Build extension
+      if: matrix.browser == 'firefox'
+      run: |
+        echo "Firefox: Building extension with web-ext..."
+        web-ext build --source-dir=src --artifacts-dir=dist --overwrite-dest
+
+    - name: Firefox - Determine AMO submission
+      if: matrix.browser == 'firefox'
+      id: amo_config
+      run: |
+        # Pre-releases never go to AMO listed channel
+        if [[ "${{ steps.release_type.outputs.is_prerelease }}" == "true" ]]; then
+          echo "submit=false" >> $GITHUB_OUTPUT
+          echo "channel=unlisted" >> $GITHUB_OUTPUT
+          echo "Pre-release: Will sign via unlisted channel only"
+        elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          # Manual trigger - use provided inputs
+          echo "submit=${{ github.event.inputs.submit_to_amo }}" >> $GITHUB_OUTPUT
+          echo "channel=${{ github.event.inputs.channel }}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.event_name }}" == "push" && "${{ vars.AMO_SUBMISSION_ENABLED }}" == "true" ]]; then
+          # Stable release with AMO enabled
+          echo "submit=true" >> $GITHUB_OUTPUT
+          echo "channel=listed" >> $GITHUB_OUTPUT
+        else
+          echo "submit=false" >> $GITHUB_OUTPUT
+          echo "channel=unlisted" >> $GITHUB_OUTPUT
+        fi
+
+        # Log configuration for debugging
+        echo "AMO_SUBMISSION_ENABLED variable: ${{ vars.AMO_SUBMISSION_ENABLED }}"
+        echo "Event type: ${{ github.event_name }}"
+        echo "Will submit to AMO: $(cat $GITHUB_OUTPUT | grep submit | cut -d= -f2)"
+        echo "Channel: $(cat $GITHUB_OUTPUT | grep channel | cut -d= -f2)"
+
+    - name: Firefox - Submit to AMO (listed channel)
+      if: matrix.browser == 'firefox' && steps.amo_config.outputs.submit == 'true' && steps.amo_config.outputs.channel == 'listed'
+      env:
+        AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
+        AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
+      run: |
+        # Check if AMO credentials are configured
+        if [[ -z "$AMO_API_KEY" || -z "$AMO_API_SECRET" ]]; then
+          echo "❌ AMO credentials not configured. Please set AMO_API_KEY and AMO_API_SECRET secrets."
+          echo "amo_submitted=false" >> $GITHUB_ENV
+          exit 1
+        fi
+
+        echo "Firefox: Submitting to AMO for public distribution..."
+
+        # Prepare submission notes
+        if [[ -n "${{ github.event.inputs.version_notes }}" ]]; then
+          NOTES="${{ github.event.inputs.version_notes }}"
+        else
+          NOTES="Automated submission for version ${{ steps.get_version.outputs.version }}"
+        fi
+
+        # Create source code archive for AMO review (required for listed submissions)
+        echo "Creating source code archive..."
+        git archive -o dist/source-code.zip HEAD
+
+        # Submit to AMO listed channel (public distribution)
+        web-ext sign --source-dir=src --artifacts-dir=dist-amo \
+          --api-key="$AMO_API_KEY" --api-secret="$AMO_API_SECRET" \
+          --channel=listed \
+          --upload-source-code=dist/source-code.zip || {
+            echo "⚠️ AMO submission failed - continuing with unsigned build"
+            echo "amo_submitted=false" >> $GITHUB_ENV
+            exit 0
+        }
+
+        if ls dist-amo/*.xpi 1> /dev/null 2>&1; then
+          echo "✅ Successfully submitted to AMO for review"
+          echo "amo_submitted=true" >> $GITHUB_ENV
+        else
+          echo "amo_submitted=false" >> $GITHUB_ENV
+        fi
+
+    - name: Firefox - Sign extension (unlisted/self-distribution)
+      if: matrix.browser == 'firefox' && (steps.amo_config.outputs.submit == 'false' || steps.amo_config.outputs.channel == 'unlisted')
+      env:
+        AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
+        AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
+      run: |
+        # Check if AMO credentials are configured
+        if [[ -z "$AMO_API_KEY" || -z "$AMO_API_SECRET" ]]; then
+          echo "⚠️ AMO credentials not configured. Skipping signing."
+          echo "Extension will be unsigned (requires Developer Edition or temporary installation)"
+          exit 0
+        fi
+
+        echo "Firefox: Signing extension for self-distribution..."
+        web-ext sign --source-dir=src --artifacts-dir=dist-signed \
+          --api-key="$AMO_API_KEY" --api-secret="$AMO_API_SECRET" \
+          --channel=unlisted || echo "⚠️ Signing failed"
+
+    # Future Chrome/Edge build steps would go here:
+    # - name: Chrome - Build extension
+    #   if: matrix.browser == 'chrome'
+    #   run: echo "Chrome build steps..."
+
+    - name: Firefox - Get build artifact
+      if: matrix.browser == 'firefox'
+      id: get_firefox_artifact
+      run: |
+        # Check for AMO submitted version, then signed version, then fall back to unsigned
+        if [ "${{ env.amo_submitted }}" == "true" ] && [ -d "dist-amo" ] && [ "$(ls -A dist-amo/*.xpi 2>/dev/null)" ]; then
+          filename=$(ls dist-amo/*.xpi | head -1 | xargs basename)
+          filepath="dist-amo/$filename"
+          echo "signed=amo" >> $GITHUB_OUTPUT
+        elif [ -d "dist-signed" ] && [ "$(ls -A dist-signed/*.xpi 2>/dev/null)" ]; then
+          filename=$(ls dist-signed/*.xpi | head -1 | xargs basename)
+          filepath="dist-signed/$filename"
+          echo "signed=true" >> $GITHUB_OUTPUT
+        else
+          filename=$(ls dist/*.zip | head -1 | xargs basename)
+          filepath="dist/$filename"
+          echo "signed=false" >> $GITHUB_OUTPUT
+        fi
+        echo "filename=$filename" >> $GITHUB_OUTPUT
+        echo "filepath=$filepath" >> $GITHUB_OUTPUT
+        echo "Found Firefox artifact: $filename (signed: $([ -d dist-signed ] && echo 'yes' || echo 'no'))"
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        CURRENT_VERSION="${{ steps.get_version.outputs.version_name }}"
+        IS_PRERELEASE="${{ steps.release_type.outputs.is_prerelease }}"
+
+        # Function to check if a tag is a pre-release
+        is_prerelease_tag() {
+          local tag=$1
+          # Remove 'v' prefix if present
+          local version=${tag#v}
+          # Check for pre-release suffixes (rc, beta, alpha, pre)
+          if [[ "$version" =~ -(rc|beta|alpha|pre)[0-9]*$ ]]; then
+            return 0  # true
+          else
+            return 1  # false
+          fi
+        }
+
+        # Get all tags sorted by version
+        all_tags=$(git tag -l --sort=-version:refname)
+
+        # Find the last stable release (same logic for both stable and pre-release)
+        echo "Finding last stable release..."
+        previous_stable=""
+        for tag in $all_tags; do
+          # Skip the current tag if it's a stable release
+          if [ "$IS_PRERELEASE" == "false" ] && [ "$tag" == "${{ github.ref_name }}" ]; then
+            continue
+          fi
+
+          # Find the first stable (non-pre-release) tag
+          if ! is_prerelease_tag "$tag"; then
+            previous_stable=$tag
+            echo "Found last stable release: $previous_stable"
+            break
+          fi
+        done
+
+        # Generate the changelog
+        if [ -n "$previous_stable" ]; then
+          echo "Generating changelog from $previous_stable to HEAD..."
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+
+          if [ "$IS_PRERELEASE" == "true" ]; then
+            echo "### Changes in this pre-release (since stable $previous_stable)" >> $GITHUB_OUTPUT
+          else
+            echo "### Changes since $previous_stable" >> $GITHUB_OUTPUT
+          fi
+
+          # Get commit count for context
+          commit_count=$(git rev-list --count $previous_stable..HEAD)
+          echo "" >> $GITHUB_OUTPUT
+          echo "_${commit_count} commits since last stable release_" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+
+          git log --pretty=format:"- %s (%h)" $previous_stable..HEAD >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+
+
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "No previous stable release found, generating initial release notes..."
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "## Initial Release" >> $GITHUB_OUTPUT
+          echo "First official release of Goodreads Shelf Position Editor." >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### Features" >> $GITHUB_OUTPUT
+          git log --pretty=format:"- %s (%h)" --reverse >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create Release with Asset (Firefox)
+      if: matrix.browser == 'firefox' && (github.event_name == 'push' || github.event.inputs.create_release == 'true')
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Use appropriate source path and extension
+        if [ "${{ steps.get_firefox_artifact.outputs.signed }}" == "amo" ]; then
+          # AMO submitted version
+          cp "${{ steps.get_firefox_artifact.outputs.filepath }}" "dist/gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}-amo.xpi"
+          xpi_file="dist/gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}-amo.xpi"
+        elif [ "${{ steps.get_firefox_artifact.outputs.signed }}" == "true" ]; then
+          # Already has .xpi extension from signing
+          cp "${{ steps.get_firefox_artifact.outputs.filepath }}" "dist/gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}-signed.xpi"
+          xpi_file="dist/gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}-signed.xpi"
+        else
+          # Rename unsigned .zip to .xpi
+          mv "${{ steps.get_firefox_artifact.outputs.filepath }}" "dist/gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}.xpi"
+          xpi_file="dist/gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}.xpi"
+        fi
+
+        # Create release notes file
+        cat > release_notes.md << 'EOF'
+        # Goodreads Shelf Position Editor v${{ steps.get_version.outputs.version }}
+
+        View and edit your To Read shelf position directly on Goodreads book pages.
+
+        ## Firefox Installation
+
+        EOF
+
+        # Add appropriate installation instructions based on signing status
+        if [ "${{ steps.get_firefox_artifact.outputs.signed }}" == "amo" ]; then
+          cat >> release_notes.md << 'EOF'
+        **🎉 This release has been submitted to addons.mozilla.org for public distribution!**
+
+        The extension will be available on AMO after review. In the meantime, you can download the `.xpi` file below under the **Assets** section for immediate installation.
+
+        EOF
+        elif [ "${{ steps.get_firefox_artifact.outputs.signed }}" == "true" ]; then
+          cat >> release_notes.md << 'EOF'
+        **✅ This release is signed by Mozilla and can be installed directly.**
+
+        To install the extension:
+        1. In the **Assets** section below, select the `.xpi` file.
+        2. You should receive a Firefox prompt to add the extension; select "Continue to Installation"
+
+        Alternatively, you can install the extension manually:
+        1. Download the `.xpi` file link in the **Assets** section below
+        2. Open the file with Firefox or drag it into a Firefox window
+        3. Click "Add" when prompted
+
+        EOF
+        else
+          cat >> release_notes.md << 'EOF'
+        **⚠️ This is an unsigned build. Installation options:**
+
+        **Option 1: Firefox Developer Edition or Nightly**
+        1. In Firefox Developer/Nightly, go to `about:config`
+        2. Set `xpinstall.signatures.required` to `false`
+        3. Download and install the `.xpi` file normally
+
+        **Option 2: Temporary Installation (Regular Firefox)**
+        1. Right-click the `.xpi` file link below and select "Save Link As" to download the extension (if you click the link, Firefox will try to install it which will be blocked because it's unsigned)
+        2. Go to [about:debugging → "This Firefox"](about:debugging#/runtime/this-firefox)
+        3. Click "Load Temporary Add-on..."
+        4. Select the `.xpi` file you downloaded in Step 1
+
+        EOF
+        fi
+
+        # Add pre-release notice if applicable
+        if [ "${{ steps.release_type.outputs.is_prerelease }}" == "true" ]; then
+          cat >> release_notes.md << 'EOF'
+
+        ---
+
+        **⚠️ Pre-release Version**
+
+        This is a pre-release version for testing new features.
+        - May contain bugs or incomplete features
+        - Will auto-update to stable version when released
+        - Please report issues at https://github.com/evanwon/gr-shelf-position-editor/issues
+
+        EOF
+        fi
+
+        cat >> release_notes.md << 'EOF'
+
+        ## What's New
+        ${{ steps.changelog.outputs.changelog }}
+
+        ---
+
+        **Firefox Requirements:** Version 109+
+        **Permissions:** storage, host permissions for goodreads.com
+        EOF
+
+        # Determine release flags based on type
+        if [[ "${{ steps.release_type.outputs.is_prerelease }}" == "true" ]]; then
+          RELEASE_FLAGS="--prerelease"
+          RELEASE_TITLE="Goodreads Shelf Position Editor v${{ steps.get_version.outputs.version }} (Pre-release)"
+        else
+          RELEASE_FLAGS=""
+          RELEASE_TITLE="Goodreads Shelf Position Editor v${{ steps.get_version.outputs.version }}"
+        fi
+
+        # Create release with asset using GitHub CLI
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          # Tag-triggered release
+          gh release create "${{ github.ref_name }}" \
+            --title "$RELEASE_TITLE" \
+            --notes-file release_notes.md \
+            $RELEASE_FLAGS \
+            "$xpi_file"
+        else
+          # Manual trigger - create release with current commit
+          gh release create "v${{ steps.get_version.outputs.version }}-manual-$(date +%Y%m%d%H%M%S)" \
+            --title "$RELEASE_TITLE (Manual Build)" \
+            --notes-file release_notes.md \
+            --prerelease \
+            "$xpi_file"
+        fi
+
+    - name: Build Summary
+      run: |
+        echo "🎉 ${{ matrix.browser }} build completed for v${{ steps.get_version.outputs.version }}!"
+        if [ "${{ matrix.browser }}" == "firefox" ]; then
+          if [ "${{ steps.get_firefox_artifact.outputs.signed }}" == "amo" ]; then
+            echo "🎉 Firefox Asset: gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}-amo.xpi (Submitted to AMO)"
+            echo "📦 AMO Status: Submitted for review on addons.mozilla.org"
+          elif [ "${{ steps.get_firefox_artifact.outputs.signed }}" == "true" ]; then
+            echo "✅ Firefox Asset: gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}-signed.xpi (SIGNED for self-distribution)"
+          else
+            echo "⚠️ Firefox Asset: gr-shelf-position-editor-firefox-v${{ steps.get_version.outputs.version }}.xpi (unsigned)"
+          fi
+          if [[ "${{ github.event_name }}" == "push" || "${{ github.event.inputs.create_release }}" == "true" ]]; then
+            echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+          else
+            echo "📦 Build artifacts available in workflow run"
+          fi
+        fi
+
+    - name: Upload artifacts (manual builds)
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release != 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: firefox-extension-v${{ steps.get_version.outputs.version }}
+        path: |
+          dist/*.zip
+          dist/*.xpi
+          dist-signed/*.xpi
+          dist-amo/*.xpi
+        retention-days: 30

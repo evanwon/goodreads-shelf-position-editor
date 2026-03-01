@@ -1,0 +1,47 @@
+name: Test Pull Request
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'test/**'
+      - 'package*.json'
+      - 'jest.config.js'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci --ignore-scripts
+
+    - name: Security audit
+      run: |
+        npm audit --audit-level=moderate || {
+          echo "::warning::Security vulnerabilities found! Run 'npm audit' locally for details."
+          npm audit --audit-level=moderate --json > audit-results.json
+          exit 1
+        }
+
+    - name: Run linting
+      run: npx web-ext lint --source-dir=src
+
+    - name: Run tests with coverage
+      run: npm run test:ci
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        fail_ci_if_error: false
