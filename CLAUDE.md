@@ -6,17 +6,58 @@ Firefox WebExtension that shows and edits your To Read shelf position directly o
 
 ```
 gr-shelf-position-editor/
-├── manifest.json       # Manifest V2, matches /book/show/* pages
-├── content.js          # All logic: discover user, find book, inject widget, save
-├── content.css         # Widget styles (Goodreads color palette)
-├── options.html        # Extension options page (cache TTL setting)
-├── options.js          # Options page logic (browser.storage.local)
-├── icons/icon-48.svg
-├── _archive/           # Previous approaches (gitignored)
-├── .gitignore
-├── CLAUDE.md
-└── README.md
+├── src/
+│   ├── manifest.json       # Manifest V3, matches /book/show/* pages
+│   ├── content.js          # Core logic: user discovery, shelf lookup, widget, save
+│   ├── content.css         # Widget styles (Goodreads color palette)
+│   ├── options.html        # Extension options page (cache TTL setting)
+│   ├── options.js          # Options page logic (browser.storage.local)
+│   ├── utils/
+│   │   ├── parse.js        # Pure parsing/validation functions
+│   │   └── cache.js        # Cache lifecycle functions
+│   └── icons/              # PNG icons (16/32/48/96/128) + source SVG
+├── test/
+│   ├── setup.js            # Jest setup with browser API mocks
+│   ├── utils/              # Unit tests (parse.test.js, cache.test.js)
+│   ├── fixtures/           # HTML test fixtures
+│   └── visual/             # Selenium visual tests
+├── .github/workflows/
+│   ├── test-pr.yml         # PR validation (lint + tests)
+│   └── build-release.yml   # Release build with AMO submission
+├── docs/plans/             # Planning documents
+├── .vscode/                # VS Code config (Firefox debugger)
+├── package.json            # Scripts: test, build, lint, dev
+├── jest.config.js          # Test configuration
+├── jsconfig.json, .npmrc, .gitattributes
+├── CLAUDE.md, README.md, PRIVACY.md, TODO.md, LICENSE
+└── .gitignore
 ```
+
+## Essential Commands
+
+- `npm test` — Run unit tests
+- `npm run test:watch` — Run tests in watch mode
+- `npm run test:coverage` — Generate coverage report
+- `npm run lint:firefox` — Validate extension with web-ext
+- `npm run build:firefox` — Lint + build extension (.xpi)
+- `npm run dev` — Run extension in Firefox with hot reload
+- `npm run test:build` — Full pre-commit check (test + lint + build)
+
+## Version Management
+
+Current version: **1.0.0** (in both `src/manifest.json` and `package.json`).
+
+Releases are driven by git tags via `.github/workflows/build-release.yml`:
+
+- **Stable release**: Push tag `v1.0.0` → tests, lint, build, AMO submission (if enabled), GitHub release
+- **Pre-release**: Push tag `v1.1.0-rc1` (or `-beta`, `-alpha`) → tests, lint, build, unlisted signing, GitHub pre-release
+- **Manual**: `workflow_dispatch` for testing (optional release creation, AMO channel selection)
+
+The manifest uses both `version` (strict semver for browsers) and `version_name` (display name, can include pre-release suffix like `1.1.0-rc1`).
+
+**GitHub configuration required for AMO submission:**
+- Secrets: `AMO_API_KEY`, `AMO_API_SECRET`
+- Variable: `AMO_SUBMISSION_ENABLED` (set to `true` to auto-submit stable tags)
 
 ## How It Works
 
@@ -33,6 +74,7 @@ content.js runs on every `/book/show/*` page and executes these steps:
 ## Key Technical Details
 
 - **Manifest V3** (cross-browser; Chrome support planned). `version_name` in manifest is Chrome-specific (Firefox warns but ignores it) — keep it for future Chrome publishing
+- **Multi-file content scripts**: `utils/parse.js` and `utils/cache.js` are loaded before `content.js` in manifest's `content_scripts.js` array — they share content script scope (no ES modules, no duplication)
 - Content scripts use **absolute URLs** for fetch — relative URLs resolve against the extension origin
 - CSRF token from `<meta name="csrf-token">` (homepage fetch, since book pages lack it)
 - **Shelf IDs** (used in the save API) differ from **review IDs** (used in DOM row IDs) — the two-phase lookup maps between them
@@ -50,7 +92,13 @@ content.js runs on every `/book/show/*` page and executes these steps:
 
 ## How to Test
 
-1. `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `manifest.json`
+### Automated tests
+- `npm test` — unit tests for `parse.js` and `cache.js`
+- `npm run test:coverage` — with coverage report
+- `npm run lint:firefox` — web-ext manifest/source validation
+
+### Manual integration testing
+1. `npm run dev` or `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → select `src/manifest.json`
 2. Navigate to a book on your To Read shelf → widget shows "Loading…" then position
 3. Navigate to a book NOT on your shelf → widget shows "Not on your To Read shelf"
 4. Change position, press Enter or click Save → green flash, position persists on refresh

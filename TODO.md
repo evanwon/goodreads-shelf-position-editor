@@ -36,9 +36,14 @@ Prioritized by impact. See the full review in `.claude/plans/reflective-scribbli
 
 ## P4 — AMO Polish / Listing Quality
 
-- [ ] **Add 96px icon for high-DPI displays**
-  Firefox recommends 96px for toolbar and AMO listing. Add `"96": "icons/icon-96.svg"`
-  to `manifest.json` icons and create the SVG.
+- [x] **Add 96px icon for high-DPI displays**
+  PNG icons at 16/32/48/96/128px now exist in `src/icons/`.
 
 - [x] **Add `author` and `homepage_url` to manifest**
   Optional but recommended for AMO listings. Helps establish trust.
+
+---
+
+## Remaining — AMO Publishing
+
+- [ ] **Phase 8: Submit to AMO** — requires AMO developer account setup, API keys configured as GitHub secrets (`AMO_API_KEY`, `AMO_API_SECRET`), and `AMO_SUBMISSION_ENABLED` repo variable set to `true`. See `docs/plans/2026-02-27-amo-publishing-plan.md`.
