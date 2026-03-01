@@ -18,7 +18,7 @@ This is a multi-session effort. Each phase below is independently committable.
 - [x] **Phase 3**: Icon Generation (16/32/48/96/128px PNGs)
 - [x] **Phase 4**: Extract Utility Modules (parse.js, cache.js)
 - [x] **Phase 5**: Testing Setup (Jest + test suites)
-- [ ] **Phase 6**: CI/CD Pipeline (GitHub Actions)
+- [x] **Phase 6**: CI/CD Pipeline (GitHub Actions)
 - [ ] **Phase 7**: Documentation Updates
 - [ ] **Phase 8**: First AMO Submission
 
@@ -275,7 +275,7 @@ module.exports = {
 
 ---
 
-## Phase 6: CI/CD Pipeline — [ ]
+## Phase 6: CI/CD Pipeline — [x] Done
 
 **Goal**: GitHub Actions workflows replicating fancy-links, adapted for this project.
 
