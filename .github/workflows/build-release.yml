@@ -172,7 +172,7 @@ jobs:
         git archive -o dist/source-code.zip HEAD
 
         # Create AMO metadata with license (required for listed submissions)
-        echo '{"version": {"license": "MIT"}}' > dist/amo-metadata.json
+        echo '{"version": {"license": "MIT"}, "categories": {"firefox": ["other"]}}' > dist/amo-metadata.json
 
         # Submit to AMO listed channel (public distribution)
         web-ext sign --source-dir=src --artifacts-dir=dist-amo \
