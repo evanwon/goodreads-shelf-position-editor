@@ -19,7 +19,7 @@ This is a multi-session effort. Each phase below is independently committable.
 - [x] **Phase 4**: Extract Utility Modules (parse.js, cache.js)
 - [x] **Phase 5**: Testing Setup (Jest + test suites)
 - [x] **Phase 6**: CI/CD Pipeline (GitHub Actions)
-- [ ] **Phase 7**: Documentation Updates
+- [x] **Phase 7**: Documentation Updates
 - [ ] **Phase 8**: First AMO Submission
 
 ---
@@ -175,7 +175,7 @@ Use a `tools/generate-icons.js` script (one-off, not a build dependency). Could 
 
 ---
 
-## Phase 4: Extract Utility Modules for Testability — [ ]
+## Phase 4: Extract Utility Modules for Testability — [x] Done
 
 **Goal**: Extract pure functions from the 835-line content.js IIFE into separate files that Jest can import, using the same multi-file content script pattern fancy-links uses.
 
@@ -332,7 +332,7 @@ For a pre-release of version 2.1.0:
 
 ---
 
-## Phase 7: Documentation Updates — [ ]
+## Phase 7: Documentation Updates — [x] Done
 
 **Goal**: Update all docs to reflect new structure and workflows.
 
@@ -370,7 +370,7 @@ For a pre-release of version 2.1.0:
 - **Name**: Goodreads Shelf Position Editor
 - **Summary**: View and edit your To Read shelf position directly on Goodreads book pages
 - **Category**: Productivity / Tools
-- **Screenshots**: 2-3 showing the widget on Goodreads book pages (loading state, position display, save confirmation)
+- **Screenshots**: 2 showing the widget on Goodreads book pages (position display, not-on-shelf state) — stored in `docs/screenshots/`
 - **Privacy policy**: Link to PRIVACY.md in repo (already comprehensive)
 - **Homepage**: GitHub repo URL
 
