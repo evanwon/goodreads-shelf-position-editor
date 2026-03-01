@@ -179,7 +179,8 @@ jobs:
           --api-key="$AMO_API_KEY" --api-secret="$AMO_API_SECRET" \
           --channel=listed \
           --amo-metadata=dist/amo-metadata.json \
-          --upload-source-code=dist/source-code.zip
+          --upload-source-code=dist/source-code.zip \
+          --timeout=300000
 
         if ls dist-amo/*.xpi 1> /dev/null 2>&1; then
           echo "✅ Successfully submitted to AMO for review"
