@@ -10,6 +10,8 @@ Goodreads lets you order your To Read shelf by position, but editing a book's po
 
 On any Goodreads book page (`goodreads.com/book/show/...`), a small widget appears near the shelf buttons:
 
+![The shelf position widget showing an editable position field on a Goodreads book page](docs/screenshots/widget-position.png)
+
 - **Book is on your To Read shelf** — shows an editable position field with Save and Refresh controls
 - **Book is not on your shelf** — shows a short notice instead
 
