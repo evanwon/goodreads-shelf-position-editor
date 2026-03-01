@@ -282,12 +282,12 @@ module.exports = {
 ### `.github/workflows/test-pr.yml`
 Triggers: PRs to `main` touching `src/**`, `test/**`, `package*.json`, `jest.config.js`
 
-Steps: checkout → Node 22 → npm ci → security audit → web-ext lint → test:ci → upload coverage to Codecov
+Steps: checkout → Node 22 → npm ci → security audit → web-ext lint → test:ci
 
 ### `.github/workflows/build-release.yml`
 Triggers: push tags `v*` OR manual `workflow_dispatch`
 
-Manual inputs (same as fancy-links): `create_release`, `submit_to_amo`, `channel`, `version_notes`
+Manual inputs: `create_release`, `submit_to_amo`, `channel`
 
 Steps (adapted from fancy-links build-release.yml):
 1. Checkout with 50-commit history + fetch tags
@@ -298,7 +298,7 @@ Steps (adapted from fancy-links build-release.yml):
 6. Validate manifest (check `manifest_version === 3`)
 7. Extract version from tag or manifest, extract `version_name`
 8. Detect pre-release from `version_name` suffix (rc/beta/alpha/pre)
-9. `web-ext lint --source-dir=src --warnings-as-errors`
+9. `web-ext lint --source-dir=src` (note: `--warnings-as-errors` was dropped due to web-ext 8.9.0 catch-22 with `data_collection_permissions` — warns if missing, errors if present)
 10. `web-ext build --source-dir=src --artifacts-dir=dist`
 11. Determine AMO submission (pre-release → unlisted; stable + AMO_SUBMISSION_ENABLED → listed)
 12. Submit to AMO listed channel (with source code archive) OR sign unlisted
@@ -382,7 +382,7 @@ For a pre-release of version 2.1.0:
 ### First-submission tips
 - Include source code archive (workflow handles this via `git archive`)
 - PRIVACY.md and README.md provide reviewer context
-- The `data_collection_permissions` field in manifest is already set correctly
+- `data_collection_permissions` is intentionally absent from manifest — web-ext 8.9.0 rejects it as "reserved for future usage". Re-add when a future web-ext version supports it
 - No obfuscated code, no external dependencies — review should be straightforward
 
 ---

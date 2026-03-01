@@ -22,11 +22,6 @@ on:
           - listed
           - unlisted
         default: listed
-      version_notes:
-        description: 'Version notes for AMO submission'
-        type: string
-        required: false
-
 permissions:
   contents: write  # Required for creating releases and uploading assets
 
@@ -51,6 +46,7 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '22'
+        cache: 'npm'
 
     - name: Install dependencies
       run: npm ci --ignore-scripts
@@ -170,13 +166,6 @@ jobs:
         fi
 
         echo "Firefox: Submitting to AMO for public distribution..."
-
-        # Prepare submission notes
-        if [[ -n "${{ github.event.inputs.version_notes }}" ]]; then
-          NOTES="${{ github.event.inputs.version_notes }}"
-        else
-          NOTES="Automated submission for version ${{ steps.get_version.outputs.version }}"
-        fi
 
         # Create source code archive for AMO review (required for listed submissions)
         echo "Creating source code archive..."
