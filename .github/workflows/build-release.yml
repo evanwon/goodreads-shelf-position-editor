@@ -179,11 +179,7 @@ jobs:
           --api-key="$AMO_API_KEY" --api-secret="$AMO_API_SECRET" \
           --channel=listed \
           --amo-metadata=dist/amo-metadata.json \
-          --upload-source-code=dist/source-code.zip || {
-            echo "⚠️ AMO submission failed - continuing with unsigned build"
-            echo "amo_submitted=false" >> $GITHUB_ENV
-            exit 0
-        }
+          --upload-source-code=dist/source-code.zip
 
         if ls dist-amo/*.xpi 1> /dev/null 2>&1; then
           echo "✅ Successfully submitted to AMO for review"
