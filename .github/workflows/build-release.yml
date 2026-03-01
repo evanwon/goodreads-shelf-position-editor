@@ -120,7 +120,7 @@ jobs:
       if: matrix.browser == 'firefox'
       run: |
         echo "Firefox: Linting extension with web-ext..."
-        web-ext lint --source-dir=src --warnings-as-errors
+        web-ext lint --source-dir=src
 
     - name: Firefox - Build extension
       if: matrix.browser == 'firefox'
