@@ -13,10 +13,13 @@
     "lint:firefox": "web-ext lint --source-dir=src",
     "test:build": "npm test && npm run lint:firefox && npm run build",
     "dev": "web-ext run --source-dir=src",
-    "test:visual": "node test/visual/run.js"
+    "test:visual": "node test/visual/run.js",
+    "version:bump": "extension-version-bump",
+    "version:check": "extension-validate-versions"
   },
   "devDependencies": {
     "@types/firefox-webext-browser": "^143.0.0",
+    "extension-workflows": "github:evanwon/extension-workflows",
     "geckodriver": "^6.1.0",
     "jest": "30.1.3",
     "jest-environment-jsdom": "30.1.2",
