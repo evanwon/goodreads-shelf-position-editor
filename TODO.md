@@ -46,4 +46,4 @@ Prioritized by impact. See the full review in `.claude/plans/reflective-scribbli
 
 ## Remaining — AMO Publishing
 
-- [ ] **Phase 8: Submit to AMO** — requires AMO developer account setup, API keys configured as GitHub secrets (`AMO_API_KEY`, `AMO_API_SECRET`), and `AMO_SUBMISSION_ENABLED` repo variable set to `true`. See `docs/plans/2026-02-27-amo-publishing-plan.md`.
+- [x] **Phase 8: Submit to AMO** — requires AMO developer account setup, API keys configured as GitHub secrets (`AMO_API_KEY`, `AMO_API_SECRET`), and `AMO_SUBMISSION_ENABLED` repo variable set to `true`. See `docs/plans/2026-02-27-amo-publishing-plan.md`.

@@ -19,7 +19,9 @@ Edit the number, press Enter or click Save, and the position updates immediately
 
 ## Install
 
-> AMO (addons.mozilla.org) listing is in progress. In the meantime, signed builds are available from [GitHub Releases](https://github.com/evanwon/goodreads-shelf-position-editor/releases).
+### From AMO (recommended)
+
+**[Install from addons.mozilla.org](https://addons.mozilla.org/en-US/firefox/addon/goodreads-shelf-position-edit/)** — automatic updates included.
 
 ### From a GitHub release
 
