@@ -47,7 +47,7 @@ gr-shelf-position-editor/
 
 ## Version Management
 
-Current version: **1.0.0** (in both `src/manifest.json` and `package.json`).
+Run `npm run version:check` to validate version consistency between `src/manifest.json` and `package.json`.
 
 CI/CD workflows are shared via [`evanwon/extension-workflows`](https://github.com/evanwon/extension-workflows) (reusable GitHub Actions). Version tooling is also provided by that package:
 
