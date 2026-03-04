@@ -75,18 +75,41 @@ npm test
 | `npm run build:firefox` | Lint + build `.xpi` |
 | `npm run dev` | Launch Firefox with the extension loaded |
 | `npm run test:build` | Full pre-commit check (test + lint + build) |
+| `npm run version:bump` | Automate version bumps (see [Releases](#releases)) |
+| `npm run version:check` | Validate manifest/package.json version consistency |
 
 ### Project layout
 
-Extension source lives in `src/`, tests in `test/`, CI workflows in `.github/workflows/`. See [CLAUDE.md](CLAUDE.md) for detailed architecture notes.
+Extension source lives in `src/`, tests in `test/`. CI/CD uses shared reusable workflows from [`evanwon/extension-workflows`](https://github.com/evanwon/extension-workflows). See [CLAUDE.md](CLAUDE.md) for detailed architecture notes.
 
 ## Releases
 
-Releases are driven by git tags via GitHub Actions (`.github/workflows/build-release.yml`):
+Releases are driven by git tags via shared GitHub Actions workflows from [`evanwon/extension-workflows`](https://github.com/evanwon/extension-workflows):
 
 - **Stable** — push a tag like `v1.0.0` to build, optionally submit to AMO, and create a GitHub release
 - **Pre-release** — push a tag like `v1.1.0-rc1` to build, sign as unlisted, and create a GitHub pre-release
 - **Manual** — trigger via `workflow_dispatch` for ad-hoc test builds
+
+### Version Management
+
+Use `npm run version:bump` to automate version updates, commits, and tags:
+
+```sh
+# Stable releases
+npm run version:bump patch       # 1.0.3 -> 1.0.4
+npm run version:bump minor       # 1.0.3 -> 1.1.0
+npm run version:bump major       # 1.0.3 -> 2.0.0
+
+# Pre-release lifecycle
+npm run version:bump rc patch    # 1.0.3 -> 1.0.4-rc1 (start RC)
+npm run version:bump rc          # 1.0.4-rc1 -> 1.0.4-rc2 (iterate)
+npm run version:bump stable      # 1.0.4-rc2 -> 1.0.4 (promote)
+
+# Then push the tag to trigger the build
+git push origin v1.0.4
+```
+
+Options: `--dry-run` to preview, `--no-git` to update files only. Run `npm run version:check` to validate version consistency between `manifest.json` and `package.json`.
 
 ## Requirements
 

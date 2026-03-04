@@ -22,8 +22,8 @@ gr-shelf-position-editor/
 │   ├── fixtures/           # HTML test fixtures
 │   └── visual/             # Selenium visual tests
 ├── .github/workflows/
-│   ├── test-pr.yml         # PR validation (lint + tests)
-│   └── build-release.yml   # Release build with AMO submission
+│   ├── test-pr.yml         # PR validation (thin caller to shared workflow)
+│   └── build-release.yml   # Release build (thin caller to shared workflow)
 ├── docs/plans/             # Planning documents
 ├── .vscode/                # VS Code config (Firefox debugger)
 ├── package.json            # Scripts: test, build, lint, dev
@@ -42,12 +42,23 @@ gr-shelf-position-editor/
 - `npm run build:firefox` — Lint + build extension (.xpi)
 - `npm run dev` — Run extension in Firefox with hot reload
 - `npm run test:build` — Full pre-commit check (test + lint + build)
+- `npm run version:bump` — Automate version bumps (commits + tags)
+- `npm run version:check` — Validate manifest/package.json version consistency
 
 ## Version Management
 
 Current version: **1.0.0** (in both `src/manifest.json` and `package.json`).
 
-Releases are driven by git tags via `.github/workflows/build-release.yml`:
+CI/CD workflows are shared via [`evanwon/extension-workflows`](https://github.com/evanwon/extension-workflows) (reusable GitHub Actions). Version tooling is also provided by that package:
+
+```bash
+npm run version:bump patch       # 1.0.3 -> 1.0.4
+npm run version:bump rc minor    # 1.0.3 -> 1.1.0-rc1
+npm run version:bump stable      # 1.1.0-rc1 -> 1.1.0
+npm run version:check            # Validate manifest/package.json consistency
+```
+
+Releases are driven by git tags via the shared build-release workflow:
 
 - **Stable release**: Push tag `v1.0.0` → tests, lint, build, AMO submission (if enabled), GitHub release
 - **Pre-release**: Push tag `v1.1.0-rc1` (or `-beta`, `-alpha`) → tests, lint, build, unlisted signing, GitHub pre-release
