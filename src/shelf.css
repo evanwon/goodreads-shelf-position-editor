@@ -1,0 +1,116 @@
+/* Goodreads Shelf Position Column — injected into search result tables */
+
+/* Header cell */
+.gr-shelf-pos-header {
+  border-bottom: 2px solid #409D69;
+  font-size: 12px;
+  font-weight: bold;
+  color: #382110;
+  white-space: nowrap;
+  text-align: center;
+  padding: 4px 8px;
+}
+
+/* Data cell */
+.gr-shelf-pos-cell {
+  text-align: center;
+  vertical-align: middle;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+/* Position input — compact for table cells */
+.gr-shelf-pos-input {
+  width: 52px;
+  padding: 3px 4px;
+  border: 1px solid #D8D8D2;
+  border-radius: 3px;
+  font-size: 12px;
+  text-align: center;
+  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #fff;
+  -moz-appearance: textfield;
+}
+
+.gr-shelf-pos-input::-webkit-inner-spin-button,
+.gr-shelf-pos-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.gr-shelf-pos-input:focus {
+  border-color: #00635D;
+  outline: none;
+  box-shadow: 0 0 3px rgba(0, 99, 93, 0.3);
+}
+
+/* Changed state — yellow highlight */
+.gr-shelf-pos-input.gr-shelf-pos-changed {
+  background-color: #FFFDE7;
+}
+
+/* Saved state — green flash */
+.gr-shelf-pos-input.gr-shelf-pos-saved {
+  background-color: #E8F5E9;
+  transition: background-color 0.3s;
+}
+
+/* Error state — red */
+.gr-shelf-pos-input.gr-shelf-pos-error,
+.gr-shelf-pos-cell.gr-shelf-pos-error {
+  background-color: #FFEBEE;
+  border-color: #c62828;
+  color: #c62828;
+}
+
+/* Save button — compact green */
+.gr-shelf-pos-save {
+  padding: 3px 8px;
+  margin-left: 3px;
+  background-color: #409D69;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: bold;
+  cursor: pointer;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.gr-shelf-pos-save:hover:not(:disabled) {
+  background-color: #357a54;
+}
+
+.gr-shelf-pos-save:focus-visible {
+  outline: 2px solid #00635D;
+  outline-offset: 2px;
+}
+
+.gr-shelf-pos-save:disabled {
+  background-color: #8CB89E;
+  cursor: not-allowed;
+}
+
+/* N/A cell (book not found in shelf data) */
+.gr-shelf-pos-na {
+  color: #999;
+  font-size: 12px;
+}
+
+/* Loading spinner */
+@keyframes gr-shelf-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.gr-shelf-pos-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #D8D8D2;
+  border-top-color: #409D69;
+  border-radius: 50%;
+  animation: gr-shelf-spin 0.8s linear infinite;
+}

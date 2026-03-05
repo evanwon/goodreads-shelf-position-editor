@@ -14,9 +14,7 @@
   });
 
   // --- Constants ---
-  const MAX_SHELF_PAGES = 50;
-  const ITEMS_PER_PAGE = 100;
-  const PAGINATION_DELAY_MS = 200;
+  // Shared constants (MAX_SHELF_PAGES, ITEMS_PER_PAGE, PAGINATION_DELAY_MS) → utils/shelf-api.js
   const OBSERVER_DEBOUNCE_MS = 1000;
   const SAVE_FLASH_MS = 2000;
 
@@ -137,95 +135,7 @@
     return null;
   }
 
-  function parsePageRows(doc, cache, targetReviewId) {
-    const rows = doc.querySelectorAll("#booksBody tr.bookalike.review");
-    let cached = 0;
-    rows.forEach((row) => {
-      const rowMatch = row.id.match(/^review_(\d+)$/);
-      if (!rowMatch) return;
-      const revId = rowMatch[1];
-      const posInput = row.querySelector('input[name^="positions["]');
-      if (!posInput) {
-        if (revId === targetReviewId) LOG("Target review", revId, "found but has no position input");
-        return;
-      }
-      const nameMatch = posInput.name.match(/^positions\[(\d+)\]$/);
-      if (!nameMatch) return;
-      const posValue = posInput.value || "";
-      if (posValue !== "" && !isValidPosition(posValue)) return;
-      cache.set(revId, { shelfId: nameMatch[1], position: posValue });
-      cached++;
-    });
-    if (cached < rows.length) LOG("Parsed", rows.length, "rows,", cached, "cached,", rows.length - cached, "skipped");
-    return rows.length;
-  }
-
-  async function findShelfData(userId, reviewId, onProgress) {
-    // Check cache first
-    const cache = loadCache(userId, cacheTtlMs);
-    LOG("Cache has", cache.size, "entries");
-
-    if (cache.has(reviewId)) {
-      LOG("Phase 2 — cache hit for review", reviewId);
-      const ts = localStorage.getItem(cacheKey(userId) + "-ts");
-      return { ...cache.get(reviewId), fromCache: true, cacheTimestamp: ts ? Number(ts) : null };
-    }
-
-    LOG("Phase 2 — paginating shelf for review", reviewId);
-
-    // Paginate the shelf sorted by date_added (newest first) — recently added
-    // books appear on page 1, and position inputs are present in non-search views.
-    // Cache ALL rows seen so future book pages are instant.
-    const maxPages = MAX_SHELF_PAGES;
-    let result = null;
-    let totalPages = null;
-
-    for (let page = 1; page <= maxPages; page++) {
-      if (onProgress) onProgress(page, totalPages);
-      const url =
-        `https://www.goodreads.com/review/list/${userId}?shelf=to-read` +
-        `&sort=date_added&order=d&per_page=${ITEMS_PER_PAGE}&page=${page}&view=table`;
-
-      const resp = await fetch(url, { credentials: "same-origin" });
-      if (!resp.ok) throw new Error(`Shelf page ${page} HTTP ${resp.status}`);
-
-      const html = await resp.text();
-      const doc = new DOMParser().parseFromString(html, "text/html");
-
-      // Parse total book count from page 1 to enable percentage progress
-      if (page === 1 && !totalPages) {
-        const titleEl = doc.querySelector("title");
-        const countMatch = titleEl?.textContent?.match(/\(([\d,]+)\s+books?\)/);
-        if (countMatch) {
-          const totalBooks = parseInt(countMatch[1].replace(/,/g, ""), 10);
-          totalPages = Math.ceil(totalBooks / ITEMS_PER_PAGE);
-          LOG("Total books:", totalBooks, "— estimated pages:", totalPages);
-        }
-      }
-
-      const rowCount = parsePageRows(doc, cache, reviewId);
-      if (rowCount === 0) break;
-
-      if (cache.has(reviewId) && !result) {
-        result = { ...cache.get(reviewId), fromCache: false };
-        LOG("Found on page", page);
-        // Keep paginating to fill cache, but stop after this page
-        saveCache(userId, cache);
-        return result;
-      }
-
-      LOG("Page", page, "—", rowCount, "rows, not found yet");
-
-      // Small delay between pages to be polite
-      if (page < maxPages) {
-        await new Promise((resolve) => setTimeout(resolve, PAGINATION_DELAY_MS));
-      }
-    }
-
-    // Save whatever we cached even if book wasn't found
-    saveCache(userId, cache);
-    return result ? result : null;
-  }
+  // parsePageRows, findShelfData, findAllShelfData, saveBatchPosition → utils/shelf-api.js
 
   // --- Step 6: Widget lifecycle (loading → loaded / empty / error) ---
 
@@ -383,7 +293,7 @@
         LOG("Cache cleared — refreshing position");
 
         try {
-          const result = await findShelfData(userId, reviewId);
+          const result = await findShelfData(userId, reviewId, cacheTtlMs);
           if (result) {
             input.value = result.position;
             input.dataset.originalValue = result.position;
@@ -524,7 +434,7 @@
 
         // Phase 2: get shelf ID + position
         updateWidgetStatus(widget, "Loading position\u2026");
-        const result = await findShelfData(userId, reviewId, (page, totalPages) => {
+        const result = await findShelfData(userId, reviewId, cacheTtlMs, (page, totalPages) => {
           if (totalPages) {
             const pct = Math.min(100, Math.round((page / totalPages) * 100));
             updateWidgetStatus(widget, "Loading position\u2026 " + pct + "%");
@@ -582,50 +492,14 @@
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving...";
 
-    const params = new URLSearchParams();
-    if (val !== "") {
-      params.append(`positions[${shelfId}]`, val);
-    }
-    params.append("view", "table");
-    params.append("authenticity_token", authToken);
-
     try {
-      const resp = await fetch(
-        `https://www.goodreads.com/shelf/move_batch/${userId}`,
-        {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            "X-CSRF-Token": authToken,
-          },
-          body: params.toString(),
-        }
-      );
-
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-      // Response may be JSON (with updated positions) or HTML (success but no data)
-      const text = await resp.text();
-      let data = null;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        LOG("Response is not JSON (length:", text.length + "), treating as success");
-      }
+      const result = await saveBatchPosition(userId, shelfId, val, authToken);
 
       // Update with server-confirmed position if available
-      if (data && data.shelves) {
-        const shelf = data.shelves.find((s) => String(s.id) === shelfId);
-        if (shelf && isValidPosition(shelf.position)) {
-          input.value = String(shelf.position);
-          input.dataset.originalValue = String(shelf.position);
-        } else {
-          input.dataset.originalValue = val;
-        }
+      if (result.confirmedPosition) {
+        input.value = result.confirmedPosition;
+        input.dataset.originalValue = result.confirmedPosition;
       } else {
-        // Server accepted but didn't return JSON — trust the value we sent
         input.dataset.originalValue = val;
       }
 
@@ -697,7 +571,7 @@
 
       // Phase 2: Paginate non-search shelf view to get shelf ID + position
       updateWidgetStatus(widget, "Loading position\u2026");
-      const result = await findShelfData(userId, reviewId, (page, totalPages) => {
+      const result = await findShelfData(userId, reviewId, cacheTtlMs, (page, totalPages) => {
         if (totalPages) {
           const pct = Math.min(100, Math.round((page / totalPages) * 100));
           updateWidgetStatus(widget, "Loading position\u2026 " + pct + "%");
