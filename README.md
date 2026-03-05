@@ -1,12 +1,14 @@
 # Goodreads Shelf Position Editor
 
-A Firefox browser extension that adds a shelf position editor to Goodreads book pages, making it easy to view and update where a book sits on your To Read list.
+A Firefox browser extension that adds shelf position editing to Goodreads book pages and shelf search results, making it easy to view and update where a book sits on your To Read list.
 
 ## Why
 
 Goodreads lets you order your To Read shelf by position, but editing a book's position requires navigating to the shelf page, and the shelf's search view doesn't display the position column at all. This extension surfaces that information directly on each book's detail page, where it's most useful.
 
 ## What It Does
+
+### Book pages
 
 On any Goodreads book page (`goodreads.com/book/show/...`), a small widget appears near the shelf buttons:
 
@@ -16,6 +18,14 @@ On any Goodreads book page (`goodreads.com/book/show/...`), a small widget appea
 - **Book is not on your shelf** — shows a short notice instead
 
 Edit the number, press Enter or click Save, and the position updates immediately.
+
+### Shelf search results
+
+When you search your To Read shelf, Goodreads hides the position column. This extension adds it back:
+
+![The position column injected into shelf search results](docs/screenshots/search-position.png)
+
+Each book in the search results gets an editable position field. Change a value and press Enter or Tab to save — a green flash confirms success.
 
 ## Install
 
@@ -36,20 +46,33 @@ Edit the number, press Enter or click Save, and the position updates immediately
 
 ## Usage
 
+**On book pages:**
 1. Visit any book page on `goodreads.com`
 2. The widget appears with a brief loading indicator while it fetches your shelf data
 3. If the book is on your To Read shelf, edit the position and press **Enter** or click **Save**
 4. A green flash confirms the save
 
+**On shelf search results:**
+1. Go to your To Read shelf and search for a book
+2. A **#** (position) column appears in the search results
+3. Edit any position and press **Enter** or **Tab** to save
+
 The first page load fetches your full shelf data and caches it locally. Subsequent visits to any book page resolve instantly from cache. Cache expires after one week by default — configurable in the extension's options (Add-ons Manager > Goodreads Shelf Position Editor > Options). If you reorder your shelf directly on Goodreads, click the refresh button on the widget to re-sync.
 
 ## How It Works
 
+**Book pages** (`content.js`):
 1. Extracts the book ID from the page URL
 2. Searches your To Read shelf to confirm the book is present and find its review ID
 3. Looks up the book's shelf position from cached shelf data (fetches on first visit)
 4. Injects a position input widget on the page
 5. Saves position changes via Goodreads' internal endpoints
+
+**Shelf search results** (`shelf.js`):
+1. Detects when a search is active on a To Read shelf view
+2. Injects a position column header and editable cells into the results table
+3. Resolves each book's shelf ID and position from cached shelf data
+4. Saves inline edits via the same Goodreads endpoints
 
 All requests go directly to `goodreads.com` using your existing session. No external servers are contacted. See [PRIVACY.md](PRIVACY.md) for full details.
 

@@ -1,24 +1,27 @@
 # Goodreads Shelf Position Editor
 
-Firefox WebExtension that shows and edits your To Read shelf position directly on Goodreads book detail pages (`/book/show/*`). Chrome support is planned soon — keep cross-browser compatibility in mind when making changes (use MV3, avoid Firefox-only APIs without Chrome equivalents).
+Firefox WebExtension that shows and edits your To Read shelf position on Goodreads book detail pages (`/book/show/*`) and shelf search results (`/review/list/*`). Chrome support is planned soon — keep cross-browser compatibility in mind when making changes (use MV3, avoid Firefox-only APIs without Chrome equivalents).
 
 ## Project Structure
 
 ```
 gr-shelf-position-editor/
 ├── src/
-│   ├── manifest.json       # Manifest V3, matches /book/show/* pages
-│   ├── content.js          # Core logic: user discovery, shelf lookup, widget, save
-│   ├── content.css         # Widget styles (Goodreads color palette)
+│   ├── manifest.json       # Manifest V3, matches /book/show/* and /review/list/* pages
+│   ├── content.js          # Book page: user discovery, shelf lookup, widget, save
+│   ├── content.css         # Book page widget styles (Goodreads color palette)
+│   ├── shelf.js            # Shelf search: inject position column, inline editing
+│   ├── shelf.css           # Shelf search position column styles
 │   ├── options.html        # Extension options page (cache TTL setting)
 │   ├── options.js          # Options page logic (browser.storage.local)
 │   ├── utils/
 │   │   ├── parse.js        # Pure parsing/validation functions
-│   │   └── cache.js        # Cache lifecycle functions
+│   │   ├── cache.js        # Cache lifecycle functions
+│   │   └── shelf-api.js    # Shared API functions (user discovery, shelf data, save)
 │   └── icons/              # PNG icons (16/32/48/96/128) + source SVG
 ├── test/
 │   ├── setup.js            # Jest setup with browser API mocks
-│   ├── utils/              # Unit tests (parse.test.js, cache.test.js)
+│   ├── utils/              # Unit tests (parse.test.js, cache.test.js, shelf-api.test.js)
 │   ├── fixtures/           # HTML test fixtures
 │   └── visual/             # Selenium visual tests
 ├── .github/workflows/
@@ -72,6 +75,8 @@ The manifest uses both `version` (strict semver for browsers) and `version_name`
 
 ## How It Works
 
+### Book pages (content.js)
+
 content.js runs on every `/book/show/*` page and executes these steps:
 
 1. **Extract book ID** from URL path (`/book/show/(\d+)`)
@@ -82,10 +87,22 @@ content.js runs on every `/book/show/*` page and executes these steps:
 6. **Inject widget** near shelf buttons — shows progressive loading states, then either the position editor (`Position: [ N ] [Save] [↻]`), a "not on shelf" message, or an error
 7. **Save**: `POST /shelf/move_batch/{USER_ID}` with `positions[{SHELF_ID}]=N` body. Response may be JSON or HTML; both are handled
 
+### Shelf search pages (shelf.js)
+
+shelf.js runs on every `/review/list/*` page and activates when a search is active on a To Read shelf:
+
+1. **Activation check** — verifies the page is a To Read shelf with an active search query (search results strip the position column)
+2. **Discover user ID + CSRF token** — same shared logic as content.js via `shelf-api.js`
+3. **Inject position column** — adds a `#` header and editable position cells to each row in the search results table
+4. **Resolve positions** — extracts review IDs from table rows, looks up shelf IDs and positions from cache (fetches on miss)
+5. **Inline editing** — Enter or Tab saves the new position; green/red flash for success/error feedback
+6. **MutationObserver** — watches for Goodreads dynamic table updates (pagination, re-sorting) and re-injects the column
+
 ## Key Technical Details
 
 - **Manifest V3** (cross-browser; Chrome support planned). `version_name` in manifest is Chrome-specific (Firefox warns but ignores it) — keep it for future Chrome publishing
-- **Multi-file content scripts**: `utils/parse.js` and `utils/cache.js` are loaded before `content.js` in manifest's `content_scripts.js` array — they share content script scope (no ES modules, no duplication)
+- **Two content script entries** in the manifest: one for `/book/show/*` (content.js) and one for `/review/list/*` (shelf.js). Both share `utils/parse.js`, `utils/cache.js`, and `utils/shelf-api.js` as common dependencies loaded first in content script scope
+- **Shared API layer** (`shelf-api.js`): user discovery, CSRF token fetch, shelf data pagination, and position save logic are extracted into shared functions used by both content.js and shelf.js
 - Content scripts use **absolute URLs** for fetch — relative URLs resolve against the extension origin
 - CSRF token from `<meta name="csrf-token">` (homepage fetch, since book pages lack it)
 - **Shelf IDs** (used in the save API) differ from **review IDs** (used in DOM row IDs) — the two-phase lookup maps between them
@@ -104,7 +121,7 @@ content.js runs on every `/book/show/*` page and executes these steps:
 ## How to Test
 
 ### Automated tests
-- `npm test` — unit tests for `parse.js` and `cache.js`
+- `npm test` — unit tests for `parse.js`, `cache.js`, and `shelf-api.js`
 - `npm run test:coverage` — with coverage report
 - `npm run lint:firefox` — web-ext manifest/source validation
 
@@ -113,4 +130,6 @@ content.js runs on every `/book/show/*` page and executes these steps:
 2. Navigate to a book on your To Read shelf → widget shows "Loading…" then position
 3. Navigate to a book NOT on your shelf → widget shows "Not on your To Read shelf"
 4. Change position, press Enter or click Save → green flash, position persists on refresh
-5. Console logs prefixed with `[GR Shelf Position]`
+5. Navigate to your To Read shelf, search for a book → position column appears with editable values
+6. Change a position in search results, press Enter → green flash, position persists on refresh
+7. Console logs prefixed with `[GR Shelf Position]`
