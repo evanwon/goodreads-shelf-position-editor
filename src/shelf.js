@@ -22,6 +22,10 @@
   var OBSERVER_DEBOUNCE_MS = 1000;
   var POSITION_COL_CLASS = "gr-shelf-pos-col";
 
+  // Track recently saved reviews so refreshes/mutations don't overwrite optimistic values.
+  // Maps reviewId -> { value, shelfId } for cells that were just saved.
+  var justSavedReviews = new Map();
+
   // --- Step 1: Activation checks ---
 
   // Guard: skip if position column already injected
@@ -113,9 +117,17 @@
     if (headerRow.querySelector("." + POSITION_COL_CLASS)) return;
 
     var th = document.createElement("th");
-    th.className = POSITION_COL_CLASS + " gr-shelf-pos-header";
-    th.textContent = "Position";
-    headerRow.appendChild(th);
+    th.className = POSITION_COL_CLASS + " header field position gr-shelf-pos-header";
+    th.textContent = "#";
+    th.title = "Position";
+
+    var refHeader = headerRow.querySelector(".header.field.cover")
+                 || headerRow.querySelector(".header.field.title");
+    if (refHeader) {
+      headerRow.insertBefore(th, refHeader);
+    } else {
+      headerRow.appendChild(th);
+    }
   }
 
   function injectCellForRow(row) {
@@ -123,14 +135,20 @@
     if (row.querySelector("." + POSITION_COL_CLASS)) return null;
 
     var td = document.createElement("td");
-    td.className = POSITION_COL_CLASS + " gr-shelf-pos-cell";
+    td.className = POSITION_COL_CLASS + " field position gr-shelf-pos-cell";
 
     // Loading state
     var spinner = document.createElement("span");
     spinner.className = "gr-shelf-pos-spinner";
     td.appendChild(spinner);
 
-    row.appendChild(td);
+    var refCell = row.querySelector("td.field.cover")
+              || row.querySelector("td.field.title");
+    if (refCell) {
+      row.insertBefore(td, refCell);
+    } else {
+      row.appendChild(td);
+    }
     return td;
   }
 
@@ -157,36 +175,106 @@
     input.dataset.originalValue = position;
     input.placeholder = "#";
 
-    var saveBtn = document.createElement("button");
-    saveBtn.className = "gr-shelf-pos-save";
-    saveBtn.textContent = "Save";
-    saveBtn.disabled = true;
+    // Tooltip (hidden by default) — matches native Goodreads Prototip "creamy" style
+    var tooltip = document.createElement("div");
+    tooltip.className = "gr-shelf-pos-tooltip";
+    tooltip.style.display = "none";
+
+    var stem = document.createElement("div");
+    stem.className = "gr-shelf-pos-stem";
+
+    var content = document.createElement("div");
+    content.className = "gr-shelf-pos-tooltip-content";
+
+    var saveLink = document.createElement("a");
+    saveLink.href = "#";
+    saveLink.className = "gr-shelf-pos-tooltip-save";
+    saveLink.textContent = "Save position changes";
+
+    var spacer = document.createTextNode("\u00a0\u00a0");
+
+    var closeLink = document.createElement("a");
+    closeLink.href = "#";
+    closeLink.className = "gr-shelf-pos-tooltip-close";
+    closeLink.textContent = "close";
+
+    content.appendChild(saveLink);
+    content.appendChild(spacer);
+    content.appendChild(closeLink);
+    tooltip.appendChild(stem);
+    tooltip.appendChild(content);
+
+    var tooltipVisible = false;
+
+    function showTooltip() {
+      if (tooltipVisible) return;
+      tooltip.style.display = "";
+      tooltipVisible = true;
+    }
+
+    function hideTooltip() {
+      tooltip.style.display = "none";
+      tooltipVisible = false;
+    }
+
+    function canSave() {
+      var val = input.value.trim();
+      var invalid = val !== "" && (!/^\d+$/.test(val) || parseInt(val, 10) < 1);
+      var changed = val !== input.dataset.originalValue;
+      return changed && !invalid;
+    }
 
     input.addEventListener("input", function () {
       var val = input.value.trim();
       var invalid = val !== "" && (!/^\d+$/.test(val) || parseInt(val, 10) < 1);
       var changed = val !== input.dataset.originalValue;
-      saveBtn.disabled = !changed || invalid;
       input.classList.toggle("gr-shelf-pos-changed", changed && !invalid);
       input.classList.toggle("gr-shelf-pos-error", invalid);
       if (!invalid) input.classList.remove("gr-shelf-pos-saved");
     });
 
+    input.addEventListener("focus", function () {
+      showTooltip();
+    });
+
     input.addEventListener("keydown", function (e) {
       if (e.key === "Enter") {
         e.preventDefault();
-        if (!saveBtn.disabled) handleSave(input, saveBtn);
+        if (canSave()) handleSave(input, tooltip);
+      }
+      if (e.key === "Escape") {
+        input.value = input.dataset.originalValue;
+        input.classList.remove("gr-shelf-pos-changed", "gr-shelf-pos-error");
+        hideTooltip();
+        input.blur();
       }
     });
 
-    saveBtn.addEventListener("click", function () {
-      if (saveBtn.disabled) return;
-      saveBtn.disabled = true;
-      handleSave(input, saveBtn);
+    saveLink.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (canSave()) handleSave(input, tooltip);
     });
 
-    cell.appendChild(input);
-    cell.appendChild(saveBtn);
+    closeLink.addEventListener("click", function (e) {
+      e.preventDefault();
+      input.value = input.dataset.originalValue;
+      input.classList.remove("gr-shelf-pos-changed", "gr-shelf-pos-error");
+      hideTooltip();
+      input.blur();
+    });
+
+    // Close tooltip on outside click
+    document.addEventListener("mousedown", function (e) {
+      if (tooltipVisible && !cell.contains(e.target)) {
+        hideTooltip();
+      }
+    });
+
+    var wrapper = document.createElement("span");
+    wrapper.className = "gr-shelf-pos-wrapper";
+    wrapper.appendChild(input);
+    wrapper.appendChild(tooltip);
+    cell.appendChild(wrapper);
   }
 
   function setCellDash(cell) {
@@ -210,7 +298,11 @@
         var cell = row.querySelector("." + POSITION_COL_CLASS);
         if (!cell) return;
 
-        if (results.has(rid)) {
+        // Use optimistic value if this review was just saved
+        if (justSavedReviews.has(rid)) {
+          var saved = justSavedReviews.get(rid);
+          createPositionEditor(cell, rid, saved.shelfId, saved.value);
+        } else if (results.has(rid)) {
           var data = results.get(rid);
           createPositionEditor(cell, rid, data.shelfId, data.position);
         } else {
@@ -239,7 +331,7 @@
 
   // --- Step 6: Save handler ---
 
-  async function handleSave(input, saveBtn) {
+  async function handleSave(input, tooltip) {
     var val = input.value.trim();
     if (val !== "" && (!/^\d+$/.test(val) || parseInt(val, 10) < 1)) {
       input.classList.add("gr-shelf-pos-error");
@@ -247,36 +339,74 @@
     }
 
     var shelfId = input.dataset.shelfId;
-    saveBtn.disabled = true;
-    saveBtn.textContent = "\u2026";
+    var originalVal = input.dataset.originalValue;
+
+    // Determine the review ID from the closest row
+    var row = input.closest("tr.bookalike.review");
+    var rowMatch = row && row.id.match(/^review_(\d+)$/);
+    var reviewId = rowMatch ? rowMatch[1] : null;
+
+    // Immediate visual feedback: lock input + show saving state
+    input.classList.add("gr-shelf-pos-saving");
+    input.readOnly = true;
+    tooltip.style.display = "none";
+
+    // Register optimistic value BEFORE the await — protects against
+    // mutation observer firing loadPositions during the save API call,
+    // which would rebuild the cell and overwrite with stale data
+    if (reviewId) {
+      justSavedReviews.set(reviewId, { value: val, shelfId: shelfId });
+    }
 
     try {
       var result = await saveBatchPosition(userId, shelfId, val, authToken);
 
-      if (result.confirmedPosition) {
-        input.value = result.confirmedPosition;
-        input.dataset.originalValue = result.confirmedPosition;
-      } else {
-        input.dataset.originalValue = val;
+      // Check if server adjusted position to something unexpected
+      var finalVal = val;
+      if (result.confirmedPosition
+          && result.confirmedPosition !== val
+          && result.confirmedPosition !== originalVal) {
+        finalVal = result.confirmedPosition;
+        LOG("Shelf: server adjusted position to", finalVal);
+      }
+
+      // Update the map with final value (may differ from initial optimistic)
+      if (reviewId) {
+        justSavedReviews.set(reviewId, { value: finalVal, shelfId: shelfId });
       }
 
       // Clear cache — other books' positions shifted
       clearCache(userId);
 
-      input.classList.remove("gr-shelf-pos-changed");
-      input.classList.add("gr-shelf-pos-saved");
-      LOG("Shelf: position saved for shelf", shelfId, ":", input.value);
+      // Re-query input from DOM — the original may have been replaced
+      // by a mutation observer rebuild during the save await
+      var freshCell = row.querySelector("." + POSITION_COL_CLASS);
+      var freshInput = freshCell && freshCell.querySelector(".gr-shelf-pos-input");
+      if (freshInput) {
+        freshInput.value = finalVal;
+        freshInput.dataset.originalValue = finalVal;
+        freshInput.classList.remove("gr-shelf-pos-changed", "gr-shelf-pos-saving");
+        freshInput.readOnly = false;
+        freshInput.classList.add("gr-shelf-pos-saved");
+        freshInput.blur();
+        setTimeout(function () { freshInput.classList.remove("gr-shelf-pos-saved"); }, SAVE_FLASH_MS);
+      }
+      LOG("Shelf: position saved for shelf", shelfId, ":", finalVal);
 
-      setTimeout(function () { input.classList.remove("gr-shelf-pos-saved"); }, SAVE_FLASH_MS);
-
-      // Re-fetch positions for all visible rows
+      // Re-fetch positions for all visible rows (other positions shifted)
       refreshAllPositions();
     } catch (err) {
       LOG("Shelf: save failed:", err);
-      input.classList.add("gr-shelf-pos-error");
-    } finally {
-      saveBtn.textContent = "Save";
-      saveBtn.disabled = input.value === input.dataset.originalValue;
+      // Remove optimistic entry on failure
+      if (reviewId) justSavedReviews.delete(reviewId);
+      // Re-query in case input was replaced
+      var errCell = row.querySelector("." + POSITION_COL_CLASS);
+      var errInput = errCell && errCell.querySelector(".gr-shelf-pos-input");
+      if (errInput) {
+        errInput.classList.remove("gr-shelf-pos-saving");
+        errInput.readOnly = false;
+        errInput.classList.add("gr-shelf-pos-error");
+      }
     }
   }
 
@@ -284,17 +414,36 @@
     var reviewIds = extractReviewIds();
     if (reviewIds.length === 0) return;
 
+    // Show refreshing state on cells that aren't freshly saved
+    pauseObserver();
+    var currentRows = booksBody.querySelectorAll("tr.bookalike.review");
+    currentRows.forEach(function (row) {
+      var rowMatch = row.id.match(/^review_(\d+)$/);
+      if (rowMatch && justSavedReviews.has(rowMatch[1])) return;
+      var cell = row.querySelector("." + POSITION_COL_CLASS);
+      if (cell) cell.classList.add("gr-shelf-pos-refreshing");
+    });
+    resumeObserver();
+
     try {
       var results = await findAllShelfData(userId, reviewIds, cacheTtlMs);
 
       pauseObserver();
-      var currentRows = booksBody.querySelectorAll("tr.bookalike.review");
+      currentRows = booksBody.querySelectorAll("tr.bookalike.review");
       currentRows.forEach(function (row) {
         var rowMatch = row.id.match(/^review_(\d+)$/);
         if (!rowMatch) return;
         var rid = rowMatch[1];
         var cell = row.querySelector("." + POSITION_COL_CLASS);
         if (!cell) return;
+
+        cell.classList.remove("gr-shelf-pos-refreshing");
+
+        // Skip cells with optimistic values from a recent save
+        if (justSavedReviews.has(rid)) {
+          justSavedReviews.delete(rid);
+          return;
+        }
 
         if (results.has(rid)) {
           var data = results.get(rid);
@@ -304,14 +453,19 @@
             input.dataset.originalValue = data.position;
             input.dataset.shelfId = data.shelfId;
             input.classList.remove("gr-shelf-pos-changed", "gr-shelf-pos-error");
-            var saveBtn = cell.querySelector(".gr-shelf-pos-save");
-            if (saveBtn) saveBtn.disabled = true;
+            var tooltip = cell.querySelector(".gr-shelf-pos-tooltip");
+            if (tooltip) tooltip.style.display = "none";
           }
         }
       });
       resumeObserver();
     } catch (err) {
       LOG("Shelf: refresh failed:", err);
+      // Clear refreshing state on error
+      pauseObserver();
+      var cells = booksBody.querySelectorAll("." + POSITION_COL_CLASS);
+      cells.forEach(function (cell) { cell.classList.remove("gr-shelf-pos-refreshing"); });
+      resumeObserver();
     }
   }
 
