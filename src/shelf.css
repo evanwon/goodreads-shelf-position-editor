@@ -1,0 +1,194 @@
+/* Goodreads Shelf Position Column — injected into search result tables */
+
+/* Header cell — inherits native .header.field.position styles */
+.gr-shelf-pos-header {
+  font-size: 12px;
+  font-weight: bold;
+  color: #382110;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Data cell */
+.gr-shelf-pos-cell {
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Position input — compact, matches native Goodreads text input */
+.gr-shelf-pos-input {
+  width: 38px;
+  padding: 3px 2px;
+  border: 1px solid #D8D8D2;
+  font-size: 12px;
+  text-align: center;
+  font-family: "Lato", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: #fff;
+  -moz-appearance: textfield;
+}
+
+.gr-shelf-pos-input::-webkit-inner-spin-button,
+.gr-shelf-pos-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.gr-shelf-pos-input:focus {
+  border-color: #00635D;
+  outline: none;
+}
+
+/* Saving state — visible feedback during API call */
+.gr-shelf-pos-input.gr-shelf-pos-saving {
+  opacity: 0.55;
+  background-color: #F4F1EA;
+}
+
+/* Changed state — yellow highlight */
+.gr-shelf-pos-input.gr-shelf-pos-changed {
+  background-color: #FFFDE7;
+}
+
+/* Saved state — green flash */
+.gr-shelf-pos-input.gr-shelf-pos-saved {
+  background-color: #E8F5E9;
+  transition: background-color 0.3s;
+}
+
+/* Error state — red */
+.gr-shelf-pos-input.gr-shelf-pos-error,
+.gr-shelf-pos-cell.gr-shelf-pos-error {
+  background-color: #FFEBEE;
+  border-color: #c62828;
+  color: #c62828;
+}
+
+/* Wrapper positions tooltip relative to the input, not the tall table cell */
+.gr-shelf-pos-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* Save tooltip — matches native Goodreads Prototip "creamy" theme */
+.gr-shelf-pos-tooltip {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0;
+  white-space: nowrap;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  font-family: "Lato", "Helvetica Neue", Helvetica, sans-serif;
+}
+
+/* Left-pointing stem arrow (matches Prototip leftMiddle stem) */
+.gr-shelf-pos-stem {
+  width: 12px;
+  height: 15px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.gr-shelf-pos-stem::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  width: 10px;
+  height: 10px;
+  background: #f8f4ca;
+  border: 1px solid #ebe4b4;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+/* Tooltip content bubble */
+.gr-shelf-pos-tooltip-content {
+  background: #f8f4ca;
+  border: 1px solid #ebe4b4;
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: #514721;
+  font-size: 12px;
+}
+
+/* Save button — matches native Goodreads .button style */
+.gr-shelf-pos-tooltip-save {
+  border-radius: 3px;
+  border: 1px solid #D6D0C4;
+  font-family: "Lato", "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none;
+  color: #333333;
+  background-color: #F4F1EA;
+  line-height: 1;
+  padding: 8px 12px;
+}
+
+.gr-shelf-pos-tooltip-save:hover {
+  color: #333333;
+  background-color: #ede6d6;
+  text-decoration: none;
+}
+
+.gr-shelf-pos-tooltip-save:active {
+  background-color: #D6D0C4;
+}
+
+/* Close link — plain text in tooltip color */
+.gr-shelf-pos-tooltip-close {
+  color: #514721;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.gr-shelf-pos-tooltip-close:hover {
+  text-decoration: underline;
+}
+
+/* Refreshing state — dimmed while re-fetching after a save */
+.gr-shelf-pos-refreshing .gr-shelf-pos-input {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.gr-shelf-pos-refreshing::after {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 4px;
+  border: 1.5px solid #D8D8D2;
+  border-top-color: #409D69;
+  border-radius: 50%;
+  animation: gr-shelf-spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+/* N/A cell (book not found in shelf data) */
+.gr-shelf-pos-na {
+  color: #999;
+  font-size: 12px;
+}
+
+/* Loading spinner */
+@keyframes gr-shelf-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.gr-shelf-pos-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #D8D8D2;
+  border-top-color: #409D69;
+  border-radius: 50%;
+  animation: gr-shelf-spin 0.8s linear infinite;
+}

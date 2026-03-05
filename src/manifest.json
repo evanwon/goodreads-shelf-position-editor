@@ -21,10 +21,26 @@
       "js": [
         "utils/parse.js",
         "utils/cache.js",
+        "utils/shelf-api.js",
         "content.js"
       ],
       "css": [
         "content.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "*://www.goodreads.com/review/list/*"
+      ],
+      "js": [
+        "utils/parse.js",
+        "utils/cache.js",
+        "utils/shelf-api.js",
+        "shelf.js"
+      ],
+      "css": [
+        "shelf.css"
       ],
       "run_at": "document_idle"
     }
