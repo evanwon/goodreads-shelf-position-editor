@@ -28,7 +28,7 @@ permissions:
 
 jobs:
   build:
-    uses: evanwon/extension-workflows/.github/workflows/build-release.yml@v1
+    uses: evanwon/browser-extension-workflows/.github/workflows/build-release.yml@v1
     with:
       extension-name: gr-shelf-position-editor
       extension-display-name: "Goodreads Shelf Position Editor"

@@ -103,11 +103,11 @@ npm test
 
 ### Project layout
 
-Extension source lives in `src/`, tests in `test/`. CI/CD uses shared reusable workflows from [`evanwon/extension-workflows`](https://github.com/evanwon/extension-workflows). See [CLAUDE.md](CLAUDE.md) for detailed architecture notes.
+Extension source lives in `src/`, tests in `test/`. CI/CD uses shared reusable workflows from [`evanwon/browser-extension-workflows`](https://github.com/evanwon/browser-extension-workflows). See [CLAUDE.md](CLAUDE.md) for detailed architecture notes.
 
 ## Releases
 
-Releases are driven by git tags via shared GitHub Actions workflows from [`evanwon/extension-workflows`](https://github.com/evanwon/extension-workflows):
+Releases are driven by git tags via shared GitHub Actions workflows from [`evanwon/browser-extension-workflows`](https://github.com/evanwon/browser-extension-workflows):
 
 - **Stable** — push a tag like `v1.0.0` to build, optionally submit to AMO, and create a GitHub release
 - **Pre-release** — push a tag like `v1.1.0-rc1` to build, sign as unlisted, and create a GitHub pre-release

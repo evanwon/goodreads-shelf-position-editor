@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    uses: evanwon/extension-workflows/.github/workflows/test-pr.yml@v1
+    uses: evanwon/browser-extension-workflows/.github/workflows/test-pr.yml@v1
     with:
       lint-warnings-as-errors: false
       validate-versions: false
