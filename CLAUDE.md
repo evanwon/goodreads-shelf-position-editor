@@ -52,7 +52,7 @@ gr-shelf-position-editor/
 
 Run `npm run version:check` to validate version consistency between `src/manifest.json` and `package.json`.
 
-CI/CD workflows are shared via [`evanwon/extension-workflows`](https://github.com/evanwon/extension-workflows) (reusable GitHub Actions). Version tooling is also provided by that package:
+CI/CD workflows are shared via [`evanwon/browser-extension-workflows`](https://github.com/evanwon/browser-extension-workflows) (reusable GitHub Actions). Version tooling is also provided by that package:
 
 ```bash
 npm run version:bump patch       # 1.0.3 -> 1.0.4

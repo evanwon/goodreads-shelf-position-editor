@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@types/firefox-webext-browser": "^143.0.0",
-    "extension-workflows": "github:evanwon/extension-workflows",
+    "browser-extension-workflows": "github:evanwon/browser-extension-workflows",
     "geckodriver": "^6.1.0",
     "jest": "30.1.3",
     "jest-environment-jsdom": "30.1.2",
