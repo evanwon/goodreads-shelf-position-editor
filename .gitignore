@@ -31,8 +31,8 @@ Thumbs.db
 *.tmp
 *~
 
-# Claude Code settings
-.claude/
+# Claude Code local settings (the shared ones are committed)
+.claude/settings.local.json
 
 # Previous approaches
 _archive/

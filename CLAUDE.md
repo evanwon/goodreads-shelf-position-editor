@@ -2,6 +2,8 @@
 
 Firefox WebExtension that shows and edits your To Read shelf position on Goodreads book detail pages (`/book/show/*`) and shelf search results (`/review/list/*`). Chrome support is planned soon — keep cross-browser compatibility in mind when making changes (use MV3, avoid Firefox-only APIs without Chrome equivalents).
 
+Auto-memory is off here; continuity lives on the GitHub issues, and the session-start brief (`.claude/hooks/session-brief.sh`) prints the recent ones.
+
 ## Project Structure
 
 ```
@@ -52,7 +54,7 @@ gr-shelf-position-editor/
 
 Run `npm run version:check` to validate version consistency between `src/manifest.json` and `package.json`.
 
-CI/CD workflows are shared via [`evanwon/browser-extension-workflows`](https://github.com/evanwon/browser-extension-workflows) (reusable GitHub Actions). Version tooling is also provided by that package:
+CI/CD workflows are shared via [`evanwon/browser-extension-workflows`](https://github.com/evanwon/browser-extension-workflows) (reusable GitHub Actions). Version tooling is also provided by that package. [`evanwon/fancy-links`](https://github.com/evanwon/fancy-links) is the reference extension for CI/CD and releases: check how it does something before changing this repo's workflows or release tooling.
 
 ```bash
 npm run version:bump patch       # 1.0.3 -> 1.0.4
