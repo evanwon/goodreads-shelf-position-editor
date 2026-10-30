@@ -34,7 +34,7 @@ gr-shelf-position-editor/
 ├── package.json            # Scripts: test, build, lint, dev
 ├── jest.config.js          # Test configuration
 ├── jsconfig.json, .npmrc, .gitattributes
-├── CLAUDE.md, README.md, PRIVACY.md, TODO.md, LICENSE
+├── CLAUDE.md, README.md, PRIVACY.md, LICENSE
 └── .gitignore
 ```
 
