@@ -36,3 +36,4 @@ Thumbs.db
 
 # Previous approaches
 _archive/
+.claude/worktrees/
