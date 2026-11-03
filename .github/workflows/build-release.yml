@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   build:
-    uses: evanwon/browser-extension-workflows/.github/workflows/build-release.yml@5c67ff734f69ac803e9a441b5762f99190f0f3ba # harden-release-keys branch
+    uses: evanwon/browser-extension-workflows/.github/workflows/build-release.yml@8f9220707e894952a30abf7fb1a1e4a057d2fd48 # v1.2.0
     with:
       extension-name: gr-shelf-position-editor
       extension-display-name: "Goodreads Shelf Position Editor"
