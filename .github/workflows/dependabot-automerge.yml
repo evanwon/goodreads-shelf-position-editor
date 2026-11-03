@@ -44,7 +44,7 @@ jobs:
           # Paths (one regex a line, # comments) whose changes wait for a person. No file means none; any other error
           # stops the run, since reading none by mistake would merge what's held.
           if h=$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/.github/automerge-hold" 2>&1)
-          then hold=$(grep -vE '^[[:space:]]*(#|$)' <<<"$h" || true)
+          then hold=$(tr -d '\r' <<<"$h" | grep -vE '^[[:space:]]*(#|$)' || true)   # a CRLF line would never match
           elif grep -q "Not Found" <<<"$h"; then hold=""
           else echo "couldn't read .github/automerge-hold: $h" >&2; exit 1; fi
 
@@ -116,17 +116,36 @@ jobs:
                       i = match(substr(k, 2), /@/); print substr(k, 1, i) "\t" substr(k, i + 2) "\t" \
                         (/integrity:/ && !/tarball:/ ? "https://registry.npmjs.org/" : "elsewhere"); k = "" }' "$1"
                 }
+                # pnpm's lockfile doesn't name the registry, so an .npmrc pointing anywhere but npmjs means the age
+                # looked up there could be another package's.
+                for rc in "$(dirname "$f")/.npmrc" .npmrc; do
+                  if ! r=$(lockfile "${rc#./}" "$base" 2>&1); then
+                    grep -q "Not Found" <<<"$r" && continue || { echo "wait couldn't read ${rc#./}"; return; }
+                  fi
+                  ! grep -iE '^[[:space:]]*(@[^:]+:)?registry[[:space:]]*=' <<<"$r" |
+                    grep -viqE '=[[:space:]]*https://registry[.]npmjs[.]org/?[[:space:]]*$' ||
+                    { echo "wait ${rc#./} points npm at a registry other than npmjs"; return; }
+                done
                 pnpm_packages "$tmp/base" > "$tmp/base.tsv"; pnpm_packages "$tmp/head" > "$tmp/head.tsv"
+                # The lockfile lists versions, not which dependent uses which, so a package whose versions changed and
+                # span more than one major waits ("MAJOR"): a dependent could have moved between them.
                 awk -F'\t' 'function major(v) { return v ~ /^0[.]/ ? substr(v, 1, index(substr(v, 3), ".") + 1) : \
                     substr(v, 1, index(v ".", ".") - 1) }
-                  NR == FNR { had[$1 "\t" $2] = 1; any[$1] = $2; same[$1 "\t" major($2)] = $2; next }
-                  !(($1 "\t" $2) in had) { print $1 "\t" (($1 "\t" major($2)) in same ? same[$1 "\t" major($2)] : \
-                    ($1 in any ? any[$1] : "-")) "\t" $2 "\t" $3 }' "$tmp/base.tsv" "$tmp/head.tsv" |
+                  NR == FNR { b[$1 "\t" $2] = 1; vs[$1] = vs[$1] " " $2; old[$1] = $2; next }
+                  { h[$1 "\t" $2] = $3; vs[$1] = vs[$1] " " $2 }
+                  END {
+                    for (k in h) if (!(k in b)) { split(k, a, "\t"); changed[a[1]] = 1 }
+                    for (k in b) if (!(k in h)) { split(k, a, "\t"); changed[a[1]] = 1 }
+                    for (n in changed) { m = ""; c = split(vs[n], v, " ")
+                      for (i = 1; i <= c; i++) if (m == "") m = major(v[i]); else if (major(v[i]) != m) { print n "\tMAJOR\t-\t"; break } }
+                    for (k in h) if (!(k in b)) { split(k, a, "\t"); print a[1] "\t" (a[1] in old ? old[a[1]] : "-") "\t" a[2] "\t" h[k] }
+                  }' "$tmp/base.tsv" "$tmp/head.tsv" |
                   sort -u > "$tmp/changes" || { echo "wait couldn't compare $f with $base"; return; }
               fi
               # A lockfile that changed with nothing read from it is one this job misread, not a safe one.
               [ -s "$tmp/changes" ] || { echo "wait found no package changes in $f"; return; }
               while IFS=$'\t' read -r name old new resolved; do
+                [ "$old" != MAJOR ] || { echo "wait $name's versions span more than one major"; return; }
                 [[ $new != *-* ]] || { echo "wait $name@$new is a prerelease"; return; }
                 [[ $resolved == https://registry.npmjs.org/* ]] ||
                   { echo "wait $name@$new doesn't come from the npm registry"; return; }
