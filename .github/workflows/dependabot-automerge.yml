@@ -69,6 +69,13 @@ jobs:
             jq -e '[.files[].path] as $f | all($f[] | select(endswith("package.json"));
               (sub("package[.]json$"; "package-lock.json")) as $l | $f | index([$l]) != null)' <<<"$pr" >/dev/null ||
               { echo "wait it changes a package.json without its package-lock.json"; return; }
+            # If the base changed a package file since the PR branched, merging would combine the two into a lockfile
+            # no check ran on. Dependabot rebases the PR; the next run takes it.
+            for f in $(jq -r '.files[].path' <<<"$pr"); do
+              [ "$(gh api "repos/$GH_REPO/contents/$f?ref=$base" --jq .sha 2>/dev/null)" = \
+                "$(gh api "repos/$GH_REPO/contents/$f?ref=$(jq -r .baseRefName <<<"$pr")" --jq .sha 2>/dev/null)" ] ||
+                { echo "wait $f changed on the base since it branched"; return; }
+            done
             for f in $(jq -r '.files[].path | select(endswith("package-lock.json"))' <<<"$pr"); do
               lockfile "$f" "$sha" > "$tmp/head.json" && jq -e '.packages' "$tmp/head.json" >/dev/null ||
                 { echo "wait couldn't read $f as a v2 or v3 lockfile"; return; }
@@ -97,9 +104,10 @@ jobs:
             echo "merge $sha"
           }
 
+          # One merge a run: the rest of the open PRs were checked against the base before it, not after.
           for n in $(gh pr list --repo "$GH_REPO" --author app/dependabot --state open --json number --jq '.[].number'); do
             read -r verdict detail <<<"$(check "$n")"
             if [ "$verdict" != merge ]; then echo "#$n waits: $detail"
             elif [ "$DRY_RUN" = true ]; then echo "#$n would merge"
-            else gh pr merge "$n" --repo "$GH_REPO" "$method" --match-head-commit "$detail"; echo "#$n merged"; fi
+            else gh pr merge "$n" --repo "$GH_REPO" "$method" --match-head-commit "$detail"; echo "#$n merged"; break; fi
           done
