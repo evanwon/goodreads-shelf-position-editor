@@ -72,7 +72,7 @@ Releases are driven by git tags via the shared build-release workflow:
 The manifest uses both `version` (strict semver for browsers) and `version_name` (display name, can include pre-release suffix like `1.1.0-rc1`).
 
 **GitHub configuration required for AMO submission:**
-- Secrets: `AMO_API_KEY`, `AMO_API_SECRET`
+- Secrets, in the `release` environment (only `v*` tags can deploy to it): `AMO_API_KEY`, `AMO_API_SECRET`
 - Variable: `AMO_SUBMISSION_ENABLED` (set to `true` to auto-submit stable tags)
 
 ## How It Works

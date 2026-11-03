@@ -4,9 +4,14 @@ on:
   push:
     tags:
       - 'v*'
+      - '!v*-dryrun'   # a tag to run dry runs on, which releases nothing by itself
 
   workflow_dispatch:
     inputs:
+      dry_run:
+        description: 'Check the store keys only, releasing nothing (run it on a v*-dryrun tag)'
+        type: boolean
+        default: false
       create_release:
         description: 'Create GitHub release (only for manual builds)'
         type: boolean
@@ -28,7 +33,7 @@ permissions:
 
 jobs:
   build:
-    uses: evanwon/browser-extension-workflows/.github/workflows/build-release.yml@v1
+    uses: evanwon/browser-extension-workflows/.github/workflows/build-release.yml@2e090dd7e599a73876befad6effa8059689421ad # harden-release-keys branch
     with:
       extension-name: gr-shelf-position-editor
       extension-display-name: "Goodreads Shelf Position Editor"
@@ -44,4 +49,4 @@ jobs:
       create-release: ${{ github.event.inputs.create_release == 'true' }}
       submit-to-amo: ${{ github.event.inputs.submit_to_amo == 'true' }}
       channel: ${{ github.event.inputs.channel || 'listed' }}
-    secrets: inherit
+      dry-run: ${{ github.event.inputs.dry_run == 'true' }}

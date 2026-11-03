@@ -6,7 +6,7 @@ on:
 
 jobs:
   test:
-    uses: evanwon/browser-extension-workflows/.github/workflows/test-pr.yml@v1
+    uses: evanwon/browser-extension-workflows/.github/workflows/test-pr.yml@2e090dd7e599a73876befad6effa8059689421ad # harden-release-keys branch
     with:
       lint-warnings-as-errors: false
       validate-versions: false
