@@ -1,0 +1,105 @@
+# Merges a Dependabot PR once it's safe to take without a person looking: every check on it passed, no package changes
+# major version, and every npm package version it adds has been public for 7 days. Hijacked releases are usually caught
+# and pulled within hours, and this machine's npm already refuses versions younger than 7 days. Anything else waits
+# for a person, and the weekly security report in evanwon/gh-repos-evanwon keeps listing it.
+# This job never installs or runs the PR's code, so its write token never meets it. A merge made with this token
+# doesn't start other workflows (a deploy on push, say); the next push does.
+# Canonical copy: evanwon/gh-repos-evanwon, repo-workflows/dependabot-automerge.yml. Copy it, don't edit it here.
+name: dependabot-automerge
+on:
+  schedule:
+    - cron: "0 16 * * *"   # daily, 08:00 Pacific
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Only report what would merge
+        type: boolean
+        default: true
+permissions:
+  contents: write
+  pull-requests: write
+concurrency: dependabot-automerge
+jobs:
+  merge:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - name: Merge the Dependabot PRs that qualify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+          MIN_AGE_DAYS: 7
+        run: |
+          set -euo pipefail
+          now=$(date -u +%s); tmp=$(mktemp -d)
+          method=$(gh repo view "$GH_REPO" --json squashMergeAllowed,mergeCommitAllowed \
+            --jq 'if .squashMergeAllowed then "--squash" elif .mergeCommitAllowed then "--merge" else "--rebase" end')
+          major() { case $1 in 0.*) echo "${1%.*}" ;; *) echo "${1%%.*}" ;; esac; }   # in 0.x, the minor breaks
+          lockfile() { gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/$1?ref=$2"; }
+
+          # Prints "merge <commit>" or "wait <reason>". Anything it can't read or check means wait.
+          check() {
+            local n=$1 pr sha base f name old new resolved t p try
+            for try in 1 2 3 4 5; do   # GitHub works out mergeability on the first ask, answering UNKNOWN till then
+              pr=$(gh pr view "$n" --json headRefOid,baseRefName,isDraft,mergeable,commits,files,statusCheckRollup) ||
+                { echo "wait couldn't read the PR"; return; }
+              jq -e '.mergeable == "UNKNOWN"' <<<"$pr" >/dev/null || break; sleep 5
+            done
+            sha=$(jq -r .headRefOid <<<"$pr")
+            # Compare with where the PR branched off, so changes made on the base since don't count as the PR's.
+            base=$(gh api "repos/$GH_REPO/compare/$(jq -r .baseRefName <<<"$pr")...$sha" --jq .merge_base_commit.sha) ||
+              { echo "wait couldn't find where it branched off"; return; }
+            jq -e '.isDraft | not' <<<"$pr" >/dev/null || { echo "wait it's a draft"; return; }
+            jq -e '.mergeable == "MERGEABLE"' <<<"$pr" >/dev/null || { echo "wait it isn't mergeable"; return; }
+            # A commit someone else pushed onto Dependabot's branch hasn't been through Dependabot's process.
+            jq -e '[.commits[].authors[].login] | unique == ["dependabot[bot]"]' <<<"$pr" >/dev/null ||
+              { echo "wait it has commits not from Dependabot"; return; }
+            jq -e '.statusCheckRollup | length > 0 and all(.[]; (.conclusion // .state) as $c |
+              $c == "SUCCESS" or $c == "NEUTRAL" or $c == "SKIPPED")' <<<"$pr" >/dev/null ||
+              { echo "wait its checks haven't all passed"; return; }
+            # CodeQL scans the code but doesn't run it, so something else has to have built or tested it.
+            jq -e '[.statusCheckRollup[] | select((.name | test("^(CodeQL|Analyze [(])") | not)
+              and (.conclusion // .state) == "SUCCESS")] | length > 0' <<<"$pr" >/dev/null ||
+              { echo "wait nothing built or tested it, only CodeQL ran"; return; }
+            # Release age can only be checked in npm lockfiles; a change to anything else waits for a person.
+            jq -e '.files | length > 0 and all(.[]; .path | test("(^|/)package(-lock)?[.]json$"))' <<<"$pr" >/dev/null ||
+              { echo "wait it changes files other than package.json and package-lock.json"; return; }
+            # Without a lockfile, installs take whatever version is newest, so nothing pins what was checked.
+            jq -e '[.files[].path] as $f | all($f[] | select(endswith("package.json"));
+              (sub("package[.]json$"; "package-lock.json")) as $l | $f | index([$l]) != null)' <<<"$pr" >/dev/null ||
+              { echo "wait it changes a package.json without its package-lock.json"; return; }
+            for f in $(jq -r '.files[].path | select(endswith("package-lock.json"))' <<<"$pr"); do
+              lockfile "$f" "$sha" > "$tmp/head.json" && jq -e '.packages' "$tmp/head.json" >/dev/null ||
+                { echo "wait couldn't read $f as a v2 or v3 lockfile"; return; }
+              lockfile "$f" "$base" > "$tmp/base.json" || echo '{}' > "$tmp/base.json"   # a lockfile the PR creates
+              # Each package whose version the PR changes or adds: name, old version ("-" if new), new, source.
+              jq -r --slurpfile b "$tmp/base.json" '($b[0].packages // {}) as $bp | .packages | to_entries[]
+                | select(.key != "" and (.value.link | not) and (.value.inBundle | not) and .value.version != null
+                  and $bp[.key].version != .value.version)
+                | [.value.name // (.key | sub(".*node_modules/"; "")), $bp[.key].version // "-",
+                   .value.version, .value.resolved // ""] | @tsv' "$tmp/head.json" | sort -u > "$tmp/changes" ||
+                { echo "wait couldn't compare $f with $base"; return; }
+              while IFS=$'\t' read -r name old new resolved; do
+                [[ $new != *-* ]] || { echo "wait $name@$new is a prerelease"; return; }
+                [[ $resolved == https://registry.npmjs.org/* ]] ||
+                  { echo "wait $name@$new doesn't come from the npm registry"; return; }
+                [ "$old" = - ] || [ "$(major "$old")" = "$(major "$new")" ] ||
+                  { echo "wait $name changes major version, $old to $new"; return; }
+                t=$(curl -fsS --compressed "https://registry.npmjs.org/${name/\//%2F}" |
+                  jq -r --arg v "$new" '.time[$v] // empty') && [ -n "$t" ] ||
+                  { echo "wait couldn't find when $name@$new was published"; return; }
+                p=$(date -u -d "$t" +%s)
+                (( now - p >= MIN_AGE_DAYS * 86400 )) ||
+                  { echo "wait $name@$new is only $(( (now - p) / 86400 )) days old"; return; }
+              done < "$tmp/changes"
+            done
+            echo "merge $sha"
+          }
+
+          for n in $(gh pr list --repo "$GH_REPO" --author app/dependabot --state open --json number --jq '.[].number'); do
+            read -r verdict detail <<<"$(check "$n")"
+            if [ "$verdict" != merge ]; then echo "#$n waits: $detail"
+            elif [ "$DRY_RUN" = true ]; then echo "#$n would merge"
+            else gh pr merge "$n" --repo "$GH_REPO" "$method" --match-head-commit "$detail"; echo "#$n merged"; fi
+          done
