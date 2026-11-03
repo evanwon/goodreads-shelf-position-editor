@@ -1,0 +1,13 @@
+# Monthly PR keeping the pinned actions and the shared release workflows current. The cooldown skips versions under
+# 7 days old, since a hijacked release is usually caught and pulled within days.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
