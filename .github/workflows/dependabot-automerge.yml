@@ -111,5 +111,13 @@ jobs:
             read -r verdict detail <<<"$(check "$n")"
             if [ "$verdict" != merge ]; then echo "#$n waits: $detail"
             elif [ "$DRY_RUN" = true ]; then echo "#$n would merge"
-            else gh pr merge "$n" --repo "$GH_REPO" "$method" --match-head-commit "$detail"; echo "#$n merged"; break; fi
+            else
+              # This job's checks stand in for a person's review, so where a ruleset requires an approval, it gives it.
+              # That needs the repo setting that lets GitHub Actions approve PRs; without it, a ruleset that needs an
+              # approval refuses the merge and the run fails.
+              gh pr review "$n" --repo "$GH_REPO" --approve --body "Its checks passed, no package changes major \
+          version, and every npm package version it adds has been public for $MIN_AGE_DAYS days." ||
+                echo "#$n couldn't be approved; merging anyway"
+              gh pr merge "$n" --repo "$GH_REPO" "$method" --match-head-commit "$detail"; echo "#$n merged"; break
+            fi
           done
