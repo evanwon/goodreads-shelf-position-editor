@@ -3,7 +3,8 @@
 # and pulled within hours, and this machine's npm already refuses versions younger than 7 days. Anything else waits
 # for a person, and the weekly security report in evanwon/gh-repos-evanwon keeps listing it.
 # This job never installs or runs the PR's code, so its write token never meets it. A merge made with this token
-# doesn't start other workflows (a deploy on push, say); the next push does.
+# doesn't start other workflows (a deploy on push, say): list the paths whose changes deploy only that way in
+# .github/automerge-hold, one regex a line, and PRs touching them wait for a person's merge, which does deploy.
 # Canonical copy: evanwon/gh-repos-evanwon, repo-workflows/dependabot-automerge.yml. Copy it, don't edit it here.
 name: dependabot-automerge
 on:
@@ -40,6 +41,12 @@ jobs:
             --jq 'if .squashMergeAllowed then "--squash" elif .mergeCommitAllowed then "--merge" else "--rebase" end')
           major() { case $1 in 0.*) echo "${1%.*}" ;; *) echo "${1%%.*}" ;; esac; }   # in 0.x, the minor breaks
           lockfile() { gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/$1?ref=$2"; }
+          # Paths (one regex a line, # comments) whose changes wait for a person. No file means none; any other error
+          # stops the run, since reading none by mistake would merge what's held.
+          if h=$(gh api -H "Accept: application/vnd.github.raw" "repos/$GH_REPO/contents/.github/automerge-hold" 2>&1)
+          then hold=$(grep -vE '^[[:space:]]*(#|$)' <<<"$h" || true)
+          elif grep -q "Not Found" <<<"$h"; then hold=""
+          else echo "couldn't read .github/automerge-hold: $h" >&2; exit 1; fi
 
           # Prints "merge <commit>" or "wait <reason>". Anything it can't read or check means wait.
           check() {
@@ -67,31 +74,58 @@ jobs:
             jq -e '[.statusCheckRollup[] | select((.name | test("^(CodeQL|Analyze [(])") | not)
               and (.conclusion // .state) == "SUCCESS")] | length > 0' <<<"$pr" >/dev/null ||
               { echo "wait nothing built or tested it, only CodeQL ran"; return; }
-            # Release age can only be checked in npm lockfiles; a change to anything else waits for a person.
-            jq -e '.files | length > 0 and all(.[]; .path | test("(^|/)package(-lock)?[.]json$"))' <<<"$pr" >/dev/null ||
-              { echo "wait it changes files other than package.json and package-lock.json"; return; }
+            # Release age can only be checked in npm and pnpm lockfiles; a change to anything else waits for a person.
+            jq -e '.files | length > 0 and all(.[]; .path | test("(^|/)(package[.]json|package-lock[.]json|pnpm-lock[.]yaml)$"))' \
+              <<<"$pr" >/dev/null || { echo "wait it changes files other than package.json and its lockfile"; return; }
             # Without a lockfile, installs take whatever version is newest, so nothing pins what was checked.
-            jq -e '[.files[].path] as $f | all($f[] | select(endswith("package.json"));
-              (sub("package[.]json$"; "package-lock.json")) as $l | $f | index([$l]) != null)' <<<"$pr" >/dev/null ||
-              { echo "wait it changes a package.json without its package-lock.json"; return; }
-            # If the base changed a package file since the PR branched, merging would combine the two into a lockfile
-            # no check ran on. Dependabot rebases the PR; the next run takes it.
+            jq -e '[.files[].path] as $f | all($f[] | select(endswith("package.json")); sub("package[.]json$"; "") as $d
+              | ($f | index([$d + "package-lock.json"]) != null or index([$d + "pnpm-lock.yaml"]) != null))' \
+              <<<"$pr" >/dev/null || { echo "wait it changes a package.json without its lockfile"; return; }
             for f in $(jq -r '.files[].path' <<<"$pr"); do
+              # A path whose changes deploy only on a person's push (a push-triggered deploy filtered by path) waits for
+              # one: this job's merge starts no workflow, so the fix would merge, close its alert, and never deploy.
+              while read -r h; do
+                [ -z "$h" ] || [[ ! $f =~ $h ]] || { echo "wait $f is held for a person (.github/automerge-hold)"; return; }
+              done <<<"$hold"
+              # If the base changed a package file since the PR branched, merging would combine the two into a lockfile
+              # no check ran on. Dependabot rebases the PR; the next run takes it.
               [ "$(gh api "repos/$GH_REPO/contents/$f?ref=$base" --jq .sha 2>/dev/null)" = \
                 "$(gh api "repos/$GH_REPO/contents/$f?ref=$(jq -r .baseRefName <<<"$pr")" --jq .sha 2>/dev/null)" ] ||
                 { echo "wait $f changed on the base since it branched"; return; }
             done
-            for f in $(jq -r '.files[].path | select(endswith("package-lock.json"))' <<<"$pr"); do
-              lockfile "$f" "$sha" > "$tmp/head.json" && jq -e '.packages' "$tmp/head.json" >/dev/null ||
-                { echo "wait couldn't read $f as a v2 or v3 lockfile"; return; }
-              lockfile "$f" "$base" > "$tmp/base.json" || echo '{}' > "$tmp/base.json"   # a lockfile the PR creates
-              # Each package whose version the PR changes or adds: name, old version ("-" if new), new, source.
-              jq -r --slurpfile b "$tmp/base.json" '($b[0].packages // {}) as $bp | .packages | to_entries[]
-                | select(.key != "" and (.value.link | not) and (.value.inBundle | not) and .value.version != null
-                  and $bp[.key].version != .value.version)
-                | [.value.name // (.key | sub(".*node_modules/"; "")), $bp[.key].version // "-",
-                   .value.version, .value.resolved // ""] | @tsv' "$tmp/head.json" | sort -u > "$tmp/changes" ||
-                { echo "wait couldn't compare $f with $base"; return; }
+            for f in $(jq -r '.files[].path | select(endswith("package-lock.json") or endswith("pnpm-lock.yaml"))' <<<"$pr"); do
+              lockfile "$f" "$sha" > "$tmp/head" || { echo "wait couldn't read $f"; return; }
+              lockfile "$f" "$base" > "$tmp/base" || : > "$tmp/base"   # a lockfile the PR creates
+              # Each package version the PR changes or adds: name, a version it had before ("-" if none; one with the
+              # same major if there is one), new version, and where it comes from.
+              if [[ $f == *.json ]]; then
+                jq -e '.packages' "$tmp/head" >/dev/null || { echo "wait $f isn't a v2 or v3 lockfile"; return; }
+                [ -s "$tmp/base" ] || echo '{}' > "$tmp/base"
+                jq -r --slurpfile b "$tmp/base" '($b[0].packages // {}) as $bp | .packages | to_entries[]
+                  | select(.key != "" and (.value.link | not) and (.value.inBundle | not) and .value.version != null
+                    and $bp[.key].version != .value.version)
+                  | [.value.name // (.key | sub(".*node_modules/"; "")), $bp[.key].version // "-",
+                     .value.version, .value.resolved // ""] | @tsv' "$tmp/head" | sort -u > "$tmp/changes" ||
+                  { echo "wait couldn't compare $f with $base"; return; }
+              else
+                grep -q "^lockfileVersion: '9" "$tmp/head" || { echo "wait $f isn't a v9 pnpm lockfile"; return; }
+                pnpm_packages() {   # "name<TAB>version<TAB>source" for each entry under packages:
+                  awk -v q="'" '/^packages:/ { p = 1; next } /^[^ ]/ { p = 0 }
+                    p && /^  [^ ]/ { k = $0; sub(/^  /, "", k); sub(/:$/, "", k); gsub(q, "", k); next }
+                    p && k != "" && /^    resolution:/ {
+                      i = match(substr(k, 2), /@/); print substr(k, 1, i) "\t" substr(k, i + 2) "\t" \
+                        (/integrity:/ && !/tarball:/ ? "https://registry.npmjs.org/" : "elsewhere"); k = "" }' "$1"
+                }
+                pnpm_packages "$tmp/base" > "$tmp/base.tsv"; pnpm_packages "$tmp/head" > "$tmp/head.tsv"
+                awk -F'\t' 'function major(v) { return v ~ /^0[.]/ ? substr(v, 1, index(substr(v, 3), ".") + 1) : \
+                    substr(v, 1, index(v ".", ".") - 1) }
+                  NR == FNR { had[$1 "\t" $2] = 1; any[$1] = $2; same[$1 "\t" major($2)] = $2; next }
+                  !(($1 "\t" $2) in had) { print $1 "\t" (($1 "\t" major($2)) in same ? same[$1 "\t" major($2)] : \
+                    ($1 in any ? any[$1] : "-")) "\t" $2 "\t" $3 }' "$tmp/base.tsv" "$tmp/head.tsv" |
+                  sort -u > "$tmp/changes" || { echo "wait couldn't compare $f with $base"; return; }
+              fi
+              # A lockfile that changed with nothing read from it is one this job misread, not a safe one.
+              [ -s "$tmp/changes" ] || { echo "wait found no package changes in $f"; return; }
               while IFS=$'\t' read -r name old new resolved; do
                 [[ $new != *-* ]] || { echo "wait $name@$new is a prerelease"; return; }
                 [[ $resolved == https://registry.npmjs.org/* ]] ||
