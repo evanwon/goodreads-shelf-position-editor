@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   build:
-    uses: evanwon/browser-extension-workflows/.github/workflows/build-release.yml@2e090dd7e599a73876befad6effa8059689421ad # harden-release-keys branch
+    uses: evanwon/browser-extension-workflows/.github/workflows/build-release.yml@5c67ff734f69ac803e9a441b5762f99190f0f3ba # harden-release-keys branch
     with:
       extension-name: gr-shelf-position-editor
       extension-display-name: "Goodreads Shelf Position Editor"
@@ -50,3 +50,7 @@ jobs:
       submit-to-amo: ${{ github.event.inputs.submit_to_amo == 'true' }}
       channel: ${{ github.event.inputs.channel || 'listed' }}
       dry-run: ${{ github.event.inputs.dry_run == 'true' }}
+    # Passed by name, these resolve to the `release` environment's values, in the shared workflow's release job only
+    secrets:
+      AMO_API_KEY: ${{ secrets.AMO_API_KEY }}
+      AMO_API_SECRET: ${{ secrets.AMO_API_SECRET }}
