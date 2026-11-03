@@ -52,9 +52,11 @@ jobs:
               { echo "wait couldn't find where it branched off"; return; }
             jq -e '.isDraft | not' <<<"$pr" >/dev/null || { echo "wait it's a draft"; return; }
             jq -e '.mergeable == "MERGEABLE"' <<<"$pr" >/dev/null || { echo "wait it isn't mergeable"; return; }
-            # A commit someone else pushed onto Dependabot's branch hasn't been through Dependabot's process.
-            jq -e '[.commits[].authors[].login] | unique == ["dependabot[bot]"]' <<<"$pr" >/dev/null ||
-              { echo "wait it has commits not from Dependabot"; return; }
+            # A commit someone else pushed onto Dependabot's branch hasn't been through Dependabot's process. An author
+            # name can be set to anything, so each commit must also be committed and signed by GitHub, as Dependabot's are.
+            gh api "repos/$GH_REPO/pulls/$n/commits?per_page=100" --jq 'all(.[]; .author.login == "dependabot[bot]"
+              and .committer.login == "web-flow" and .commit.verification.verified)' | grep -qx true ||
+              { echo "wait it has commits not made and signed by Dependabot"; return; }
             jq -e '.statusCheckRollup | length > 0 and all(.[]; (.conclusion // .state) as $c |
               $c == "SUCCESS" or $c == "NEUTRAL" or $c == "SKIPPED")' <<<"$pr" >/dev/null ||
               { echo "wait its checks haven't all passed"; return; }
