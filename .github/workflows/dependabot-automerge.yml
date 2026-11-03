@@ -18,6 +18,8 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  checks: read     # a private repo's check results are readable only with these two
+  statuses: read
 concurrency: dependabot-automerge
 jobs:
   merge:
