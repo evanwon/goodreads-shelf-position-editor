@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+# The called workflow's only job reads the repo and nothing else
+permissions:
+  contents: read
+
 jobs:
   test:
     uses: evanwon/browser-extension-workflows/.github/workflows/test-pr.yml@8f9220707e894952a30abf7fb1a1e4a057d2fd48 # v1.2.0
