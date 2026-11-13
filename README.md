@@ -41,8 +41,7 @@ Each book in the search results gets an editable position field. Change a value 
 ### From source (temporary install)
 
 1. Clone this repo and run `npm ci --ignore-scripts`
-2. Run `npm run dev` to launch Firefox with the extension loaded
-   — or open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and select `src/manifest.json`
+2. Run `npm run dev` to launch Firefox with the extension loaded — or open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and select `src/manifest.json`
 
 ## Usage
 
